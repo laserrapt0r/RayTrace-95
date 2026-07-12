@@ -132,3 +132,7 @@ Umgebungsvariablen: `W`/`H` (Auflösung), `MODE` (0–3, wie die Qualitätsstufe
 Läuft in jedem modernen Browser. Der WebM-Export setzt WebCodecs voraus
 (Chrome/Edge); ohne WebCodecs wird die Option automatisch deaktiviert, der
 GIF-Export funktioniert überall.
+
+## Lizenz
+
+[MIT](LICENSE) — © 2026 Tommy Wurzbacher
