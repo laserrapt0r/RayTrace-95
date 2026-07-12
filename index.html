@@ -177,9 +177,42 @@
         <option value="3">Ultra (weiche Schatten)</option>
       </select>
     </label>
-    <label class="cb"><input type="checkbox" id="vividChk" checked> Knallige Farben</label>
     <label class="cb"><input type="checkbox" id="ditherChk"> 256 Farben</label>
     <label class="cb"><input type="checkbox" id="autoChk"> Auto-Diashow</label>
+  </div>
+  <div class="toolbar">
+    <span class="lbl">Bild:</span>
+    <label>Farbintensität:
+      <select id="gradeSel">
+        <option value="off">Aus (roh)</option>
+        <option value="soft">Dezent</option>
+        <option value="normal" selected>Normal</option>
+        <option value="strong">Stark</option>
+        <option value="extreme">Extrem</option>
+      </select>
+    </label>
+    <label>Helligkeit:
+      <select id="expoSel">
+        <option value="dark">Dunkler</option>
+        <option value="normal" selected>Normal</option>
+        <option value="bright">Heller</option>
+        <option value="bright2">Sehr hell</option>
+      </select>
+    </label>
+    <label>Spiegelung:
+      <select id="reflSel">
+        <option value="1" selected>Normal</option>
+        <option value="0.5">Schwach</option>
+        <option value="1.5">Stark</option>
+        <option value="2">Sehr stark</option>
+      </select>
+    </label>
+    <label>Kontaktschatten:
+      <select id="aoSel">
+        <option value="0" selected>Aus</option>
+        <option value="1">An</option>
+      </select>
+    </label>
   </div>
   <div class="toolbar">
     <span class="lbl">Variation:</span>
@@ -691,7 +724,8 @@ function matMarbleTex(R, pal) {
   return { tex: { type: 'marble', c1: [0.92, 0.9, 0.87], c2: dark,
       ax: R.range(0.5, 1), az: R.range(-1, 1), freq: R.range(0.8, 2), turb: R.range(3, 7), off: R.range(0, 100) },
     diffuse: 0.85, ambK: 1, specular: R.range(0.3, 0.7), shine: R.range(40, 120),
-    reflect: R.range(0.04, 0.18), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+    reflect: R.range(0.04, 0.18), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1],
+    sss: R.range(0.4, 0.7) };
 }
 function matWood(R, pal) {
   var warm = R.chance(0.75);
@@ -1587,6 +1621,28 @@ function godRayAccum(scene, ox, oy, oz, dx, dy, dz, far) {
   acc = acc / 9 * GR.strength;
   return [L0.col[0] * acc, L0.col[1] * acc, L0.col[2] * acc];
 }
+// Ambient Occlusion: kurze Halbkugel-Strahlen → Kontaktverdunkelung (0 = offen, 1 = zu)
+var AO_DIRS = [[0, 0, 1], [0.55, 0, 0.84], [-0.55, 0, 0.84], [0, 0.55, 0.84],
+               [0, -0.55, 0.84], [0.4, 0.4, 0.82], [-0.4, -0.4, 0.82], [0.4, -0.4, 0.82]];
+function occlusionAt(scene, px, py, pz, nx, ny, nz, maxD) {
+  var t1x, t1y, t1z;
+  if (ny < 0.9 && ny > -0.9) { t1x = -nz; t1y = 0; t1z = nx; }
+  else { t1x = 1; t1y = 0; t1z = 0; }
+  var l = Math.sqrt(t1x * t1x + t1y * t1y + t1z * t1z) + 1e-9;
+  t1x /= l; t1y /= l; t1z /= l;
+  var t2x = ny * t1z - nz * t1y, t2y = nz * t1x - nx * t1z, t2z = nx * t1y - ny * t1x;
+  var ox2 = px + nx * 1e-3, oy2 = py + ny * 1e-3, oz2 = pz + nz * 1e-3;
+  var occ = 0;
+  for (var i = 0; i < AO_DIRS.length; i++) {
+    var d = AO_DIRS[i];
+    var dx = t1x * d[0] + t2x * d[1] + nx * d[2];
+    var dy = t1y * d[0] + t2y * d[1] + ny * d[2];
+    var dz = t1z * d[0] + t2z * d[1] + nz * d[2];
+    var o = intersectScene(scene, ox2, oy2, oz2, dx, dy, dz);
+    if (o && HIT_T < maxD) occ += (1 - HIT_T / maxD);
+  }
+  return occ / AO_DIRS.length;
+}
 function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
   var obj = intersectScene(scene, ox, oy, oz, dx, dy, dz);
   if (!obj) {
@@ -1647,10 +1703,16 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
     }
   }
 
+  // Ambient Occlusion (nur kamera-nahe Flächen, wenn aktiviert)
+  var aoK = 1;
+  if (scene.ao > 0 && depth === 0) {
+    aoK = 1 - occlusionAt(scene, px, py, pz, nx, ny, nz, 1.3) * scene.ao;
+  }
+
   var amb = scene.ambient;
-  var cr = base[0] * amb[0] * mat.ambK;
-  var cg = base[1] * amb[1] * mat.ambK;
-  var cb = base[2] * amb[2] * mat.ambK;
+  var cr = base[0] * amb[0] * mat.ambK * aoK;
+  var cg = base[1] * amb[1] * mat.ambK * aoK;
+  var cb = base[2] * amb[2] * mat.ambK * aoK;
 
   var lights = scene.lights;
   var sx = px + nx * 2e-4, sy = py + ny * 2e-4, sz = pz + nz * 2e-4;
@@ -1665,6 +1727,16 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
       cr += base[0] * L.col[0] * dK * att[0];
       cg += base[1] * L.col[1] * dK * att[1];
       cb += base[2] * L.col[2] * dK * att[2];
+    }
+    if (mat.sss > 0) {
+      // Subsurface: weicher Terminator (Wrap) + Rückstreuung (Licht scheint durch)
+      var wrap = (ndl + mat.sss * 0.7) / (1 + mat.sss * 0.7);
+      var wr = (Math.max(0, wrap) - Math.max(0, ndl)) * mat.diffuse * L.intensity * 0.85;
+      var vldl = dx * llx + dy * lly + dz * llz; // Blickrichtung · Lichtrichtung
+      var bk = Math.pow(Math.max(0, vldl), 3) * mat.sss * L.intensity * 0.6;
+      cr += base[0] * L.col[0] * (wr * att[0] + bk * att[0]);
+      cg += base[1] * L.col[1] * (wr * att[1] + bk * att[1]);
+      cb += base[2] * L.col[2] * (wr * att[2] + bk * att[2]);
     }
     if (mat.specular > 0) {
       var rdx = dx - 2 * nd * nx, rdy = dy - 2 * nd * ny, rdz = dz - 2 * nd * nz;
@@ -1741,11 +1813,15 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
           }
         }
       }
-    } else if (mat.reflect > 0 && mat.reflect * weight > 0.02) {
-      var rc2 = trace(scene, px + nx * 3e-4, py + ny * 3e-4, pz + nz * 3e-4, refx, refy, refz, depth + 1, weight * mat.reflect);
-      cr += rc2[0] * mat.reflect * mat.reflTint[0];
-      cg += rc2[1] * mat.reflect * mat.reflTint[1];
-      cb += rc2[2] * mat.reflect * mat.reflTint[2];
+    } else if (mat.reflect > 0) {
+      var refl = mat.reflect * scene.reflectMul;
+      if (refl > 0.97) refl = 0.97;
+      if (refl * weight > 0.02) {
+        var rc2 = trace(scene, px + nx * 3e-4, py + ny * 3e-4, pz + nz * 3e-4, refx, refy, refz, depth + 1, weight * refl);
+        cr += rc2[0] * refl * mat.reflTint[0];
+        cg += rc2[1] * refl * mat.reflTint[1];
+        cb += rc2[2] * refl * mat.reflTint[2];
+      }
     }
   }
 
@@ -1919,7 +1995,7 @@ function makeFloorMat(Rl, Rp, pal, sky, hint) {
   var kind = wpick(Rl, [['bw', 2], ['colChecker', 3.6], ['marble', 1.1], ['solid', 1.2],
                         ['grid', (sky.stars || pal.scheme === 'neon') ? 2 : 0.4], ['stripes', 0.8],
                         ['wood', hint === 'room' ? 2.5 : 0.6], ['bozo', hint === 'alien' ? 3 : 0.3]]);
-  var tex, reflect = 0.15 + Math.pow(Rl.next(), 1.2) * 0.5;
+  var tex, reflect = 0.15 + Math.pow(Rl.next(), 1.2) * 0.5, floorSss = 0;
   var sc = Rl.range(0.8, 2.2);
   switch (kind) {
     case 'bw': {
@@ -1940,6 +2016,7 @@ function makeFloorMat(Rl, Rp, pal, sky, hint) {
       tex = { type: 'marble', c1: [0.85, 0.84, 0.8], c2: Rp.chance(0.5) ? [0.2, 0.2, 0.25] : scale3(pal.obj(), 0.45),
         ax: 1, az: Rp.range(-0.6, 0.6), freq: Rp.range(0.5, 1.2), turb: Rp.range(3, 8), off: Rp.range(0, 100) };
       reflect = Rl.range(0.2, 0.5);
+      floorSss = Rl.range(0.35, 0.6);
       break;
     }
     case 'grid': {
@@ -1974,7 +2051,7 @@ function makeFloorMat(Rl, Rp, pal, sky, hint) {
     else tex.avg = texAvg(tex.c1, tex.c2);
   }
   return { tex: tex, diffuse: 0.9, ambK: 1, specular: 0.3, shine: 40,
-    reflect: reflect, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+    reflect: reflect, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1], sss: floorSss };
 }
 
 // ---------------------------------------------------------------- Szenen-Generator
@@ -3268,6 +3345,10 @@ function generateScene(seeds, opts) {
   scene.bloomAuto = Rs.chance(pal.scheme === 'neon' || night ? 0.55 : 0.3);
   scene.bloomAmt = Rs.range(0.5, 0.85);
 
+  // Ambient Occlusion (Kontaktschatten) und Spiegelungs-Verstärkung
+  scene.ao = opts.ao === 1 ? 0.85 : 0;
+  scene.reflectMul = opts.reflectMul ? opts.reflectMul : 1;
+
   // Kamera
   var cam;
   if (aisle) {
@@ -3535,10 +3616,11 @@ function applyLensFlare(data, W, H, sx, sy, flare) {
 // ---------------------------------------------------------------- Farb-Grading (Knallig-Look)
 // Sättigungs-Boost + sanfte S-Kurve — kompensiert das „Auswaschen“ durch die
 // Gamma-Korrektur und bringt den kontrastreichen CRT-Look der alten Renderer zurück.
-function applyColorGrade(data, W, H, sat, con) {
+function applyColorGrade(data, W, H, sat, con, expo) {
   var n = W * H * 4;
+  expo = expo || 1;
   for (var i = 0; i < n; i += 4) {
-    var r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255;
+    var r = data[i] / 255 * expo, g = data[i + 1] / 255 * expo, b = data[i + 2] / 255 * expo;
     var l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     r = l + (r - l) * sat;
     g = l + (g - l) * sat;
@@ -4087,9 +4169,13 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   var titleSeed = document.getElementById('titleSeed');
   var sizeSel = document.getElementById('sizeSel');
   var qualSel = document.getElementById('qualSel');
-  var vividChk = document.getElementById('vividChk');
   var ditherChk = document.getElementById('ditherChk');
-  var VIVID_SAT = 1.5, VIVID_CON = 0.3;
+  var gradeSel = document.getElementById('gradeSel');
+  var expoSel = document.getElementById('expoSel');
+  var reflSel = document.getElementById('reflSel');
+  var aoSel = document.getElementById('aoSel');
+  var GRADE_LEVELS = { off: [1, 0], soft: [1.2, 0.12], normal: [1.5, 0.3], strong: [1.85, 0.42], extreme: [2.2, 0.55] };
+  var EXPO_LEVELS = { dark: 0.82, normal: 1, bright: 1.2, bright2: 1.45 };
   var autoChk = document.getElementById('autoChk');
   var archSel = document.getElementById('archSel');
   var palSel = document.getElementById('palSel');
@@ -4116,6 +4202,8 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     });
     if (fxAna.checked) parts.push('ana=1');
     if (fxFrame.checked) parts.push('frame=1');
+    if (reflSel.value !== '1') parts.push('refl=' + reflSel.value);
+    if (aoSel.value === '1') parts.push('ao=1');
     return parts.join(',');
   }
   function applyFxString(str) {
@@ -4123,12 +4211,16 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     Object.keys(triSel).forEach(function (k) { triSel[k].value = ''; });
     fxAna.checked = false;
     fxFrame.checked = false;
+    reflSel.value = '1';
+    aoSel.value = '0';
     (str || '').split(',').forEach(function (p) {
       var kv = p.split('=');
       if (kv.length !== 2) return;
       if (kv[0] === 'sky') fxSky.value = kv[1];
       else if (kv[0] === 'ana') fxAna.checked = kv[1] === '1';
       else if (kv[0] === 'frame') fxFrame.checked = kv[1] === '1';
+      else if (kv[0] === 'refl') reflSel.value = kv[1];
+      else if (kv[0] === 'ao') aoSel.value = kv[1];
       else if (triSel[kv[0]]) triSel[kv[0]].value = kv[1];
     });
   }
@@ -4278,6 +4370,8 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       if (triSel[k].value === '1') o[k] = 1;
       else if (triSel[k].value === '0') o[k] = 0;
     });
+    if (reflSel.value !== '1') o.reflectMul = parseFloat(reflSel.value);
+    if (aoSel.value === '1') o.ao = 1;
     return o;
   }
   function optsToHash(opts) {
@@ -4369,19 +4463,21 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     var s0 = current.seeds ? current.seeds[0] : 0;
     return 'RAYTRACE 95 - SEED ' + (current.display || '') + ' - ' + (s0 % 23 + 1) + 'H ' + (s0 % 60) + 'MIN';
   }
-  // Bloom / Farb-Grading / Retro-Rahmen (in-place)
+  // Bloom / Farb-Grading / Belichtung / Retro-Rahmen (in-place)
   function postProcess(img, scene) {
     var W = img.width, H = img.height;
     var bloomOn = triSel.bloom.value === '1' || (triSel.bloom.value === '' && scene && scene.bloomAuto);
     if (bloomOn) RT90.applyBloom(img.data, W, H, scene ? scene.bloomAmt : 0.6);
-    if (vividChk.checked) RT90.applyColorGrade(img.data, W, H, VIVID_SAT, VIVID_CON);
+    var g = GRADE_LEVELS[gradeSel.value] || GRADE_LEVELS.normal;
+    var expo = EXPO_LEVELS[expoSel.value] || 1;
+    if (g[0] !== 1 || g[1] !== 0 || expo !== 1) RT90.applyColorGrade(img.data, W, H, g[0], g[1], expo);
     if (fxFrame.checked) RT90.drawCaption(img.data, W, H, captionText());
   }
-  // Zeigt lastMaster an: Bloom → Grading → Rahmen → ggf. 256 Farben
-  function presentImage() {
-    if (!lastMaster) return;
+  // Baut das fertige Bild aus lastMaster: Bloom → Grading → Rahmen → ggf. 256 Farben.
+  // Unabhängig vom aktuellen Canvas-Zustand — deshalb identisch für Anzeige UND Export.
+  function composeFinal() {
+    if (!lastMaster) return null;
     var W = lastMaster.width, H = lastMaster.height;
-    if (cv.width !== W || cv.height !== H) setCanvasSize(W, H);
     var work = new ImageData(W, H);
     work.data.set(lastMaster.data);
     postProcess(work, lastScene);
@@ -4389,10 +4485,15 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       var q = RT90.quantizeDither(work.data, W, H);
       var di = new ImageData(W, H);
       di.data.set(q.rgba);
-      ctx.putImageData(di, 0, 0);
-    } else {
-      ctx.putImageData(work, 0, 0);
+      return di;
     }
+    return work;
+  }
+  function presentImage() {
+    var out = composeFinal();
+    if (!out) return;
+    if (cv.width !== out.width || cv.height !== out.height) setCanvasSize(out.width, out.height);
+    ctx.putImageData(out, 0, 0);
   }
 
   function newImage() {
@@ -4725,7 +4826,13 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     return (current.display || 'bild').replace(/[^\w.\-]/g, '_');
   }
   function savePng() {
-    cv.toBlob(function (blob) {
+    // Aus lastMaster neu komponieren → PNG ist exakt das angezeigte, fertig gegradete Bild
+    var out = composeFinal();
+    if (!out) { cv.toBlob(function (b) { downloadBlob(b, 'raytrace95_' + cleanName() + '.png'); }, 'image/png'); return; }
+    var oc = document.createElement('canvas');
+    oc.width = out.width; oc.height = out.height;
+    oc.getContext('2d').putImageData(out, 0, 0);
+    oc.toBlob(function (blob) {
       downloadBlob(blob, 'raytrace95_' + cleanName() + '.png');
     }, 'image/png');
   }
@@ -4786,13 +4893,21 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   sizeSel.addEventListener('change', function () { if (current.seeds) startRender({ seeds: current.seeds, display: current.display }, current.opts); });
   qualSel.addEventListener('change', function () { if (current.seeds) startRender({ seeds: current.seeds, display: current.display }, current.opts); });
   ditherChk.addEventListener('change', function () { if (!busy) presentImage(); });
-  vividChk.addEventListener('change', function () { if (!busy) presentImage(); });
   archSel.addEventListener('change', function () { newImage(); });
   palSel.addEventListener('change', function () { newImage(); });
   function rerenderCurrent() {
     if (current.seeds) startRender({ seeds: current.seeds, display: current.display });
     else newImage();
   }
+  // Farbintensität + Helligkeit: reine Nachbearbeitung → sofort, ohne Neu-Rendern; als Voreinstellung merken
+  function saveImgPrefs() {
+    try { localStorage.setItem('rt95_imgprefs', JSON.stringify({ g: gradeSel.value, e: expoSel.value })); } catch (e) {}
+  }
+  gradeSel.addEventListener('change', function () { saveImgPrefs(); if (!busy) presentImage(); });
+  expoSel.addEventListener('change', function () { saveImgPrefs(); if (!busy) presentImage(); });
+  // Spiegelung + Kontaktschatten: greifen ins Rendering → neu rendern
+  reflSel.addEventListener('change', rerenderCurrent);
+  aoSel.addEventListener('change', rerenderCurrent);
   fxSky.addEventListener('change', rerenderCurrent);
   ['fog', 'mts', 'plts', 'neb', 'flare', 'rays', 'disp', 'fish'].forEach(function (k) {
     triSel[k].addEventListener('change', rerenderCurrent);
@@ -4814,6 +4929,11 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   // ---------------- Start ----------------
   fillGallery();
   refreshStrips();
+  try { // gemerkte Bild-Voreinstellungen (Farbintensität, Helligkeit)
+    var ip = JSON.parse(localStorage.getItem('rt95_imgprefs') || '{}');
+    if (ip.g && GRADE_LEVELS[ip.g]) gradeSel.value = ip.g;
+    if (ip.e && EXPO_LEVELS[ip.e]) expoSel.value = ip.e;
+  } catch (e) {}
   var h = location.hash ? location.hash.slice(1) : '';
   if (h) {
     var segs = h.split(';');

@@ -22,10 +22,13 @@ Abhängigkeiten — einfach `index.html` im Browser öffnen, kein Server nötig.
   Teilen-Link und in die Favoriten.
 - **Qualität**: Schnell (1 Strahl/Pixel) · Adaptiv (Kantenglättung nur an
   Kanten) · Maximal (4× überall) · Ultra (zusätzlich weiche Schatten).
-- **Knallige Farben** (Standard: an): Sättigungs-Boost + Kontrast-S-Kurve als
-  Nachbearbeitung — kompensiert das Auswaschen durch die Gamma-Korrektur und
-  bringt den kontrastreichen CRT-Look der alten Renderer zurück (ohne
-  Neu-Rendern umschaltbar).
+- **Bild-Leiste**: Farbintensität (Aus bis Extrem — Sättigungs-Boost +
+  Kontrast-S-Kurve, kompensiert das Auswaschen durch die Gamma-Korrektur und
+  bringt den kontrastreichen CRT-Look zurück), Helligkeit, Spiegelungsstärke
+  und Kontaktschatten (Ambient Occlusion). Farbintensität und Helligkeit sind
+  reine Nachbearbeitung (ohne Neu-Rendern umschaltbar) und werden als
+  Voreinstellung gemerkt. **Der PNG-Export bäckt exakt das angezeigte,
+  gegradete Bild ein** — was du siehst, wird gespeichert.
 - **256 Farben**: Median-Cut-Quantisierung + Floyd-Steinberg-Dithering für
   den authentischen GIF-Look von damals (ohne Neu-Rendern umschaltbar).
 - **Batch-ZIP**: rendert 8 Zufallsbilder und lädt sie gesammelt als ZIP.
@@ -70,7 +73,8 @@ und Fake-Kaustiken unter Glasobjekten.
   **Heightfield-Terrain** (Grid-basiertes Raymarching) und
   **Blobs/Metaballs** (Feld-Marching mit analytischen Normalen).
 - Effekte: volumetrische God-Rays, Prisma-Dispersion (Brechung pro
-  Farbkanal), Bloom/Glow, Anaglyph 3D, Fischaugen-Projektion.
+  Farbkanal), Bloom/Glow, Anaglyph 3D, Fischaugen-Projektion,
+  Ambient Occlusion (Kontaktschatten) und Subsurface-Schimmer bei Marmor.
 - Spiegelung, Brechung mit Fresnel (Schlick), farbige Glas-Schatten,
   prozedurale Texturen (Schachbrett, Marmor, Holz, Bozo, Streifen, Grid),
   Bump-Mapping, Distanz-Fade gegen Moiré.
