@@ -207,6 +207,11 @@
         <option value="csg">Würfel &amp; Co (CSG)</option>
         <option value="menger">Menger-Schwamm</option>
         <option value="forest">Säulenwald</option>
+        <option value="terrain">Berglandschaft</option>
+        <option value="blobs">Blobs</option>
+        <option value="pool">Schwimmbad</option>
+        <option value="chess">Schachbrett</option>
+        <option value="mirror">Spiegelsaal</option>
         <option value="chaos">Chaos</option>
       </select>
     </label>
@@ -244,6 +249,31 @@
     </select>
     <button id="btnAnim">Rendern</button>
   </div>
+  <div class="toolbar">
+    <span class="lbl">Effekte:</span>
+    <label>Himmel:
+      <select id="fxSky">
+        <option value="">Auto</option>
+        <option value="gradient">Tag</option>
+        <option value="clouds">Wolken</option>
+        <option value="sunset">Sonnenuntergang</option>
+        <option value="night">Nacht</option>
+        <option value="bands">Farbbänder</option>
+        <option value="weird">Seltsam</option>
+      </select>
+    </label>
+    <label>Nebel: <select id="fxFog" class="tri"></select></label>
+    <label>Berge: <select id="fxMts" class="tri"></select></label>
+    <label>Planeten: <select id="fxPlts" class="tri"></select></label>
+    <label>Gasnebel: <select id="fxNeb" class="tri"></select></label>
+    <label>Flare: <select id="fxFlare" class="tri"></select></label>
+    <label>God-Rays: <select id="fxRays" class="tri"></select></label>
+    <label>Prisma: <select id="fxDisp" class="tri"></select></label>
+    <label>Bloom: <select id="fxBloom" class="tri"></select></label>
+    <label>Fischauge: <select id="fxFish" class="tri"></select></label>
+    <label class="cb"><input type="checkbox" id="fxAna"> Anaglyph 3D</label>
+    <label class="cb"><input type="checkbox" id="fxFrame"> Retro-Rahmen</label>
+  </div>
   <div class="canvasWrap"><div class="canvasInner"><canvas id="cv" width="640" height="480"></canvas></div></div>
   <div class="gallery">
     <h4>Verlauf</h4>
@@ -262,7 +292,7 @@
 //__CORE_START__
 'use strict';
 var EPS = 1e-4;
-var MAX_DEPTH = 6;
+var MAX_DEPTH = 8;
 var STATS = { rays: 0 };
 
 // ---------------------------------------------------------------- RNG
@@ -471,6 +501,12 @@ function texAt(tex, x, z, y, dist) {
       break;
     default: c = tex.c1;
   }
+  if (tex.caustic) { // tanzendes Lichtnetz (Poolboden)
+    var CC = tex.caustic;
+    var rr = 1 - Math.abs(2 * fbm2(x * CC.f + CC.off, z * CC.f - CC.off, 3) - 1);
+    rr = Math.pow(rr, 5) * CC.amp;
+    c = [c[0] + rr, c[1] + rr, c[2] + rr];
+  }
   if (tex.fade && dist > 0) { // Muster in der Ferne ausblenden (gegen Moiré)
     var f = Math.min(dist / (dist + tex.fade), 0.9);
     if (f > 0.02) c = mix3(c, tex.avg, f);
@@ -490,6 +526,16 @@ function skyColor(sky, dx, dy, dz) {
     col = mix3(sky.hor, sky.zen, t);
   }
   if (dy < 0) col = scale3(col, Math.max(0.25, 1 + dy * 1.1));
+
+  if (sky.nebula && dy > -0.05) {
+    var nb = sky.nebula;
+    var npu = dx / (1.35 + Math.abs(dy)), npv = dz / (1.35 + Math.abs(dy));
+    var nm1 = smoothstep(0.42, 0.72, fbm2(npu * nb.f + nb.off, npv * nb.f - nb.off, 4));
+    var nm2 = smoothstep(0.5, 0.8, fbm2(npu * nb.f * 2.3 - nb.off, npv * nb.f * 2.3 + nb.off, 3));
+    col = [col[0] + (nb.c1[0] * nm1 + nb.c2[0] * nm2 * 0.7) * 0.55,
+           col[1] + (nb.c1[1] * nm1 + nb.c2[1] * nm2 * 0.7) * 0.55,
+           col[2] + (nb.c1[2] * nm1 + nb.c2[2] * nm2 * 0.7) * 0.55];
+  }
 
   if (sky.stars && dy > 0.03) {
     var N = 220;
@@ -845,6 +891,144 @@ function iTorus(o, ox, oy, oz, dx, dy, dz) {
   }
   return best < 0 ? -1 : tEnter + best;
 }
+// ---------------------------------------------------------------- Terrain (Heightfield, Grid + Raymarching)
+function mkTerrain(ext, amp, sc, off, snowLine, rockCol, rockCol2, lowCol, mat) {
+  var N = 512;
+  var grid = new Float32Array(N * N);
+  var stepW = (2 * ext) / (N - 1);
+  var idx = 0;
+  for (var gz = 0; gz < N; gz++) {
+    var wz = -ext + gz * stepW;
+    for (var gx = 0; gx < N; gx++) {
+      var wx = -ext + gx * stepW;
+      var v = 0, a = 0.5, f = sc;
+      for (var o2 = 0; o2 < 4; o2++) {
+        var n = noise2(wx * f + off, wz * f - off);
+        n = 1 - Math.abs(2 * n - 1); // Grate
+        v += a * n * n;
+        f *= 2.15; a *= 0.5;
+      }
+      var edx = Math.min(wx + ext, ext - wx), edz = Math.min(wz + ext, ext - wz);
+      grid[idx++] = v * amp * 1.08 * smoothstep(0, 7, Math.min(edx, edz));
+    }
+  }
+  return { type: 'terrain', x0: -ext, z0: -ext, x1: ext, z1: ext, N: N, inv: 1 / stepW,
+    grid: grid, amp: amp, hMax: amp * 1.05, off: off, snowLine: snowLine,
+    rockCol: rockCol, rockCol2: rockCol2, lowCol: lowCol, mat: mat,
+    cx: 0, cy: amp / 2, cz: 0, bound: ext * 1.45 + amp };
+}
+function terrainH(T, x, z) {
+  var fx = (x - T.x0) * T.inv, fz = (z - T.z0) * T.inv;
+  if (fx < 0) fx = 0; else if (fx > T.N - 1.001) fx = T.N - 1.001;
+  if (fz < 0) fz = 0; else if (fz > T.N - 1.001) fz = T.N - 1.001;
+  var ix = fx | 0, iz = fz | 0;
+  var ux = fx - ix, uz = fz - iz;
+  var i0 = iz * T.N + ix;
+  var a = T.grid[i0], b = T.grid[i0 + 1], c = T.grid[i0 + T.N], d = T.grid[i0 + T.N + 1];
+  return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+}
+function iTerrain(o, ox, oy, oz, dx, dy, dz) {
+  var tmin = EPS, tmax = 1e30, inv, t1, t2, tt;
+  inv = 1 / dx; t1 = (o.x0 - ox) * inv; t2 = (o.x1 - ox) * inv;
+  if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; }
+  if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+  inv = 1 / dy; t1 = (-0.3 - oy) * inv; t2 = (o.hMax + 0.05 - oy) * inv;
+  if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; }
+  if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+  inv = 1 / dz; t1 = (o.z0 - oz) * inv; t2 = (o.z1 - oz) * inv;
+  if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; }
+  if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+  if (tmax < tmin) return -1;
+  var t = tmin;
+  var prev = oy + dy * t - terrainH(o, ox + dx * t, oz + dz * t);
+  if (prev < 0) prev = 0.001;
+  for (var it = 0; it < 320 && t < tmax; it++) {
+    var step = 0.04 + prev * 0.45;
+    t += step;
+    if (t > tmax) return -1;
+    var d = oy + dy * t - terrainH(o, ox + dx * t, oz + dz * t);
+    if (d < 0) {
+      if (prev < 0.004) { prev = 0.001; continue; } // Start unter der Oberfläche → kein Selbsttreffer
+      var a2 = t - step, b2 = t;
+      for (var bi = 0; bi < 9; bi++) {
+        var m = (a2 + b2) / 2;
+        if (oy + dy * m - terrainH(o, ox + dx * m, oz + dz * m) < 0) b2 = m; else a2 = m;
+      }
+      return (a2 + b2) / 2;
+    }
+    prev = d;
+  }
+  return -1;
+}
+function terrainColor(T, px, py, pz, ny) {
+  var m = fbm2(px * 0.6 + T.off, pz * 0.6 - T.off, 3);
+  var col = mix3(T.rockCol, T.rockCol2, m);
+  if (T.lowCol) {
+    var lowA = smoothstep(T.amp * 0.45, T.amp * 0.12, py) * smoothstep(0.55, 0.85, ny);
+    col = mix3(col, T.lowCol, lowA);
+  }
+  var snowA = smoothstep(T.snowLine - T.amp * 0.12, T.snowLine + T.amp * 0.08, py + (m - 0.5) * T.amp * 0.3)
+            * smoothstep(0.38, 0.6, ny);
+  return mix3(col, [0.93, 0.95, 0.99], snowA);
+}
+
+// ---------------------------------------------------------------- Blobs (Metaballs)
+function mkBlob(comps, thr, mat) {
+  var mn = [1e30, 1e30, 1e30], mx = [-1e30, -1e30, -1e30];
+  for (var i = 0; i < comps.length; i++) {
+    var c = comps[i];
+    for (var a = 0; a < 3; a++) {
+      var cv = a === 0 ? c.x : a === 1 ? c.y : c.z;
+      if (cv - c.R < mn[a]) mn[a] = cv - c.R;
+      if (cv + c.R > mx[a]) mx[a] = cv + c.R;
+    }
+  }
+  var dg = Math.sqrt((mx[0] - mn[0]) * (mx[0] - mn[0]) + (mx[1] - mn[1]) * (mx[1] - mn[1]) + (mx[2] - mn[2]) * (mx[2] - mn[2]));
+  return { type: 'blob', comps: comps, thr: thr, mat: mat,
+    bx0: mn[0], by0: mn[1], bz0: mn[2], bx1: mx[0], by1: mx[1], bz1: mx[2],
+    cx: (mn[0] + mx[0]) / 2, cy: (mn[1] + mx[1]) / 2, cz: (mn[2] + mx[2]) / 2,
+    bound: dg / 2, step: Math.max(0.028, dg / 130) };
+}
+function blobF(o, x, y, z) {
+  var f = 0, cs = o.comps;
+  for (var i = 0; i < cs.length; i++) {
+    var c = cs[i];
+    var dx = x - c.x, dy = y - c.y, dz = z - c.z;
+    var q = 1 - (dx * dx + dy * dy + dz * dz) / (c.R * c.R);
+    if (q > 0) f += c.s * q * q;
+  }
+  return f;
+}
+function iBlob(o, ox, oy, oz, dx, dy, dz) {
+  var tmin = EPS, tmax = 1e30, inv, t1, t2, tt;
+  inv = 1 / dx; t1 = (o.bx0 - ox) * inv; t2 = (o.bx1 - ox) * inv;
+  if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; }
+  if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+  inv = 1 / dy; t1 = (o.by0 - oy) * inv; t2 = (o.by1 - oy) * inv;
+  if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; }
+  if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+  inv = 1 / dz; t1 = (o.bz0 - oz) * inv; t2 = (o.bz1 - oz) * inv;
+  if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; }
+  if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
+  if (tmax < tmin) return -1;
+  var t = tmin;
+  var inside = blobF(o, ox + dx * t, oy + dy * t, oz + dz * t) >= o.thr;
+  for (var it = 0; it < 170 && t <= tmax; it++) {
+    t += o.step;
+    var f = blobF(o, ox + dx * t, oy + dy * t, oz + dz * t);
+    if (!inside && f >= o.thr) {
+      var a2 = t - o.step, b2 = t;
+      for (var bi = 0; bi < 8; bi++) {
+        var m = (a2 + b2) / 2;
+        if (blobF(o, ox + dx * m, oy + dy * m, oz + dz * m) >= o.thr) b2 = m; else a2 = m;
+      }
+      return (a2 + b2) / 2;
+    }
+    if (inside && f < o.thr) inside = false;
+  }
+  return -1;
+}
+
 // ---------------------------------------------------------------- CSG (Differenz / Schnitt)
 // Konvexes Eintritts-/Austritts-Intervall (auch hinter dem Ursprung) oder null
 function intervalOf(o, ox, oy, oz, dx, dy, dz) {
@@ -1033,6 +1217,8 @@ function intersectObj(o, ox, oy, oz, dx, dy, dz) {
     case 'cone': return iCone(o, ox, oy, oz, dx, dy, dz);
     case 'torus': return iTorus(o, ox, oy, oz, dx, dy, dz);
     case 'csg': return iCsg(o, ox, oy, oz, dx, dy, dz);
+    case 'terrain': return iTerrain(o, ox, oy, oz, dx, dy, dz);
+    case 'blob': return iBlob(o, ox, oy, oz, dx, dy, dz);
   }
   return -1;
 }
@@ -1045,6 +1231,8 @@ function objBounds(o) {
       var rm = Math.max(o.r0, o.r1);
       return [o.cx - rm, o.y0, o.cz - rm, o.cx + rm, o.y1, o.cz + rm];
     }
+    case 'terrain': return [o.x0, -0.3, o.z0, o.x1, o.hMax + 0.05, o.z1];
+    case 'blob': return [o.bx0, o.by0, o.bz0, o.bx1, o.by1, o.bz1];
     default: {
       var b = o.bound;
       return [o.cx - b, o.cy - b, o.cz - b, o.cx + b, o.cy + b, o.cz + b];
@@ -1207,6 +1395,28 @@ function normalAt(o, px, py, pz) {
       if (o._hflip) return [-nc[0], -nc[1], -nc[2]];
       return nc;
     }
+    case 'terrain': {
+      var te = 0.1;
+      var hL = terrainH(o, px - te, pz), hR = terrainH(o, px + te, pz);
+      var hD = terrainH(o, px, pz - te), hU = terrainH(o, px, pz + te);
+      var tnx = hL - hR, tny = 2 * te, tnz = hD - hU;
+      var tnl = Math.sqrt(tnx * tnx + tny * tny + tnz * tnz);
+      return [tnx / tnl, tny / tnl, tnz / tnl];
+    }
+    case 'blob': {
+      var gx = 0, gy = 0, gz = 0, cs = o.comps;
+      for (var bi2 = 0; bi2 < cs.length; bi2++) {
+        var bc = cs[bi2];
+        var bdx = px - bc.x, bdy = py - bc.y, bdz = pz - bc.z;
+        var q = 1 - (bdx * bdx + bdy * bdy + bdz * bdz) / (bc.R * bc.R);
+        if (q > 0) {
+          var k = 4 * bc.s * q / (bc.R * bc.R);
+          gx += k * bdx; gy += k * bdy; gz += k * bdz;
+        }
+      }
+      var gl = Math.sqrt(gx * gx + gy * gy + gz * gz) + 1e-12;
+      return [gx / gl, gy / gl, gz / gl];
+    }
   }
   return [0, 1, 0];
 }
@@ -1226,7 +1436,14 @@ function shadowSeg(scene, px, py, pz, qx, qy, qz) {
   var pl = acc.planes;
   for (i = 0; i < pl.length; i++) {
     t = iPlane(pl[i], px, py, pz, lx, ly, lz);
-    if (t > EPS && t < lim) return null; // Ebenen sind hier immer opak
+    if (t > EPS && t < lim) {
+      m = pl[i].mat;
+      if (m.transparency > 0) { // z. B. Wasseroberfläche
+        var kp = m.transparency * 0.85;
+        ar *= m.tint[0] * kp; ag *= m.tint[1] * kp; ab *= m.tint[2] * kp;
+        if (ar + ag + ab < 0.02) return null;
+      } else return null;
+    }
   }
   if (acc.list) {
     var ls = acc.list;
@@ -1305,9 +1522,30 @@ function lightAtten(scene, px, py, pz, light) {
 }
 
 // ---------------------------------------------------------------- Shading
+// Volumetrische Lichtstrahlen (God-Rays) entlang des Primärstrahls
+function godRayAccum(scene, ox, oy, oz, dx, dy, dz, far) {
+  var GR = scene.godRays;
+  var L0 = scene.lights[0];
+  var jj = hash2i((dx * 8191) | 0, ((dy + dz) * 8191) | 0);
+  var acc = 0;
+  for (var gs = 0; gs < 9; gs++) {
+    var gt = (gs + jj) / 9 * far;
+    var sh = shadowSeg(scene, ox + dx * gt, oy + dy * gt, oz + dz * gt, L0.x, L0.y, L0.z);
+    if (sh) acc += (sh[0] + sh[1] + sh[2]) * 0.333 * Math.exp(-gt * GR.fall);
+  }
+  acc = acc / 9 * GR.strength;
+  return [L0.col[0] * acc, L0.col[1] * acc, L0.col[2] * acc];
+}
 function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
   var obj = intersectScene(scene, ox, oy, oz, dx, dy, dz);
-  if (!obj) return skyColor(scene.sky, dx, dy, dz);
+  if (!obj) {
+    var sc0 = skyColor(scene.sky, dx, dy, dz);
+    if (depth === 0 && scene.godRays) {
+      var g0 = godRayAccum(scene, ox, oy, oz, dx, dy, dz, 40);
+      return [sc0[0] + g0[0], sc0[1] + g0[1], sc0[2] + g0[2]];
+    }
+    return sc0;
+  }
   var t = HIT_T;
   var px = ox + dx * t, py = oy + dy * t, pz = oz + dz * t;
   var mat = obj.mat;
@@ -1325,6 +1563,9 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
     tu = rx * obj.tx + ry * obj.ty + rz * obj.tz;
     tv = rx * obj.bx + ry * obj.by + rz * obj.bz;
     base = texAt(mat.tex, tu, tv, 0, t);
+  } else if (obj.type === 'terrain') {
+    tu = px; tv = pz;
+    base = terrainColor(obj, px, py, pz, ny);
   } else {
     var lx0 = px - obj.cx, ly0 = py - obj.cy, lz0 = pz - obj.cz;
     tu = lx0 + ly0; tv = lz0 - ly0;
@@ -1419,14 +1660,32 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
       if (kk >= 0) {
         var tw = (1 - F) * mat.transparency;
         if (tw * weight > 0.02) {
-          var q = eta * cosi - Math.sqrt(kk);
-          var tdx = dx * eta + nx * q, tdy = dy * eta + ny * q, tdz = dz * eta + nz * q;
-          var tl = 1 / Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz);
-          tdx *= tl; tdy *= tl; tdz *= tl;
-          var tc = trace(scene, px - nx * 3e-4, py - ny * 3e-4, pz - nz * 3e-4, tdx, tdy, tdz, depth + 1, weight * tw);
-          cr += tc[0] * tw * mat.tint[0];
-          cg += tc[1] * tw * mat.tint[1];
-          cb += tc[2] * tw * mat.tint[2];
+          if (scene.disp > 0 && depth < MAX_DEPTH - 1) {
+            // Prisma: getrennte Brechung pro Farbkanal (R niedrigerer, B höherer IOR)
+            for (var ch2 = 0; ch2 < 3; ch2++) {
+              var iorC = mat.ior * (1 + scene.disp * (ch2 - 1));
+              var etaC = inside ? iorC : 1 / iorC;
+              var kkC = 1 - etaC * etaC * (1 - cosi * cosi);
+              if (kkC < 0) continue;
+              var qC = etaC * cosi - Math.sqrt(kkC);
+              var cdx = dx * etaC + nx * qC, cdy = dy * etaC + ny * qC, cdz = dz * etaC + nz * qC;
+              var cl2 = 1 / Math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz);
+              var tcC = trace(scene, px - nx * 3e-4, py - ny * 3e-4, pz - nz * 3e-4,
+                cdx * cl2, cdy * cl2, cdz * cl2, depth + 1, weight * tw * 0.5);
+              if (ch2 === 0) cr += tcC[0] * tw * mat.tint[0];
+              else if (ch2 === 1) cg += tcC[1] * tw * mat.tint[1];
+              else cb += tcC[2] * tw * mat.tint[2];
+            }
+          } else {
+            var q = eta * cosi - Math.sqrt(kk);
+            var tdx = dx * eta + nx * q, tdy = dy * eta + ny * q, tdz = dz * eta + nz * q;
+            var tl = 1 / Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz);
+            tdx *= tl; tdy *= tl; tdz *= tl;
+            var tc = trace(scene, px - nx * 3e-4, py - ny * 3e-4, pz - nz * 3e-4, tdx, tdy, tdz, depth + 1, weight * tw);
+            cr += tc[0] * tw * mat.tint[0];
+            cg += tc[1] * tw * mat.tint[1];
+            cb += tc[2] * tw * mat.tint[2];
+          }
         }
       }
     } else if (mat.reflect > 0 && mat.reflect * weight > 0.02) {
@@ -1441,6 +1700,10 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
     var f = 1 - Math.exp(-scene.fog.density * t);
     var fc = scene.fog.color;
     cr += (fc[0] - cr) * f; cg += (fc[1] - cg) * f; cb += (fc[2] - cb) * f;
+  }
+  if (depth === 0 && scene.godRays) {
+    var gr2 = godRayAccum(scene, ox, oy, oz, dx, dy, dz, t > 40 ? 40 : t);
+    cr += gr2[0]; cg += gr2[1]; cb += gr2[2];
   }
   return [cr, cg, cb];
 }
@@ -1510,6 +1773,8 @@ function makeSky(R, pal, hint) {
   if (pal.scheme === 'neon' && R.chance(0.6)) type = R.pick(['night', 'bands']);
   if (hint.sunset && R.chance(0.55)) type = 'sunset';
   if (hint.alien) type = wpick(R, [['weird', 3], ['sunset', 2], ['night', 2], ['bands', 1]]);
+  if (hint.sunny && R.chance(0.75)) type = R.chance(0.5) ? 'clouds' : 'gradient';
+  if (hint.forceType) type = hint.forceType;
   var sky = { type: type === 'clouds' ? 'gradient' : type, clouds: false, stars: false, sun: null,
               planets: null, mountains: null, mtMax: 0 };
   var az = R.next() * Math.PI * 2, el;
@@ -1562,18 +1827,25 @@ function makeSky(R, pal, hint) {
       glowInt: type === 'sunset' ? R.range(0.5, 1) : R.range(0.25, 0.6),
       discCos: Math.cos(type === 'sunset' ? R.range(0.02, 0.05) : R.range(0.008, 0.018)) };
   }
+  // Gasnebel (v. a. Nachthimmel)
+  var nebRoll = R.chance(type === 'night' ? 0.45 : 0.06);
+  if (hint.neb === 1 || (hint.neb !== 0 && nebRoll && sky.stars)) {
+    sky.nebula = { c1: hsl(R.next(), R.range(0.6, 0.9), R.range(0.3, 0.45)),
+      c2: hsl(R.next(), R.range(0.6, 0.9), R.range(0.25, 0.4)),
+      f: R.range(1.2, 2.5), off: R.range(0, 100) };
+  }
   // Planeten (nur bei dunklen/exotischen Himmeln)
   var planetOk = hint.alien || type === 'night' || type === 'weird' || type === 'bands' || type === 'sunset';
-  if (planetOk) {
-    var pCount = hint.alien ? R.int(1, 3) : (R.chance(0.18) ? 1 : 0);
-    if (pCount > 0) {
-      sky.planets = [];
-      for (var pi = 0; pi < pCount; pi++) sky.planets.push(makePlanet(R, pal, hint.alien));
-    }
+  var pRoll = hint.alien ? R.int(1, 3) : (R.chance(0.18) ? 1 : 0);
+  var pCount = hint.plts === 0 ? 0 : hint.plts === 1 ? Math.max(1, pRoll) : (planetOk ? pRoll : 0);
+  if (pCount > 0) {
+    sky.planets = [];
+    for (var pi = 0; pi < pCount; pi++) sky.planets.push(makePlanet(R, pal, hint.alien));
   }
   // Silhouetten-Berge am Horizont
   var mtOk = type !== 'bands';
-  if (mtOk && R.chance(hint.alien ? 0.75 : 0.3)) {
+  var mtRoll = R.chance(hint.alien ? 0.75 : 0.3);
+  if (hint.mts === 1 || (hint.mts !== 0 && mtRoll && mtOk)) {
     sky.mountains = [];
     var layers = R.int(1, 3);
     var darkBase = type === 'night' ? 0.05 : 0.35;
@@ -1650,6 +1922,43 @@ function makeFloorMat(Rl, Rp, pal, sky, hint) {
 }
 
 // ---------------------------------------------------------------- Szenen-Generator
+// Steckt der Punkt (Kamera) in einem Objekt? Präzise pro Typ, nicht nur Hüllkugel.
+function cameraInside(o, x, y, z, m) {
+  switch (o.type) {
+    case 'plane': return false;
+    case 'sphere': {
+      var dx = x - o.cx, dy = y - o.cy, dz = z - o.cz;
+      return dx * dx + dy * dy + dz * dz < (o.r + m) * (o.r + m);
+    }
+    case 'box': {
+      var lx = x - o.cx, ly = y - o.cy, lz = z - o.cz;
+      if (o.rot) {
+        var c = o.cos, s = o.sin;
+        var tx = c * lx - s * lz, tz = s * lx + c * lz;
+        lx = tx; lz = tz;
+      }
+      return Math.abs(lx) < o.hx + m && Math.abs(ly) < o.hy + m && Math.abs(lz) < o.hz + m;
+    }
+    case 'cyl': {
+      if (y < o.y0 - m || y > o.y1 + m) return false;
+      var cdx = x - o.cx, cdz = z - o.cz;
+      return cdx * cdx + cdz * cdz < (o.r + m) * (o.r + m);
+    }
+    case 'cone': {
+      if (y < o.y0 - m || y > o.y1 + m) return false;
+      var rm = Math.max(o.r0, o.r1);
+      var kdx = x - o.cx, kdz = z - o.cz;
+      return kdx * kdx + kdz * kdz < (rm + m) * (rm + m);
+    }
+    case 'terrain': return x > o.x0 && x < o.x1 && z > o.z0 && z < o.z1 && y < terrainH(o, x, z) + m + 0.4;
+    case 'csg': return cameraInside(o.A, x, y, z, m);
+    default: {
+      var bdx = x - o.cx, bdy = y - o.cy, bdz = z - o.cz;
+      return bdx * bdx + bdy * bdy + bdz * bdz < (o.bound + m) * (o.bound + m);
+    }
+  }
+}
+
 function placeOnFloor(R, placed, rMin, rMax, areaR) {
   for (var tries = 0; tries < 60; tries++) {
     var r = R.range(rMin, rMax);
@@ -1665,6 +1974,40 @@ function placeOnFloor(R, placed, rMin, rMax, areaR) {
     if (ok) { var res = { x: x, z: z, r: r }; placed.push(res); return res; }
   }
   return null;
+}
+
+// Schachfigur aus gestapelten Primitiven (Feldgröße 1)
+function addChessPiece(scene, kind, x, z, y0, mat) {
+  scene.objects.push(mkCyl(x, z, y0, y0 + 0.08, 0.32, mat)); // Sockel
+  switch (kind) {
+    case 'rook':
+      scene.objects.push(mkCyl(x, z, y0 + 0.08, y0 + 0.52, 0.23, mat));
+      scene.objects.push(mkCyl(x, z, y0 + 0.52, y0 + 0.66, 0.28, mat));
+      break;
+    case 'bishop':
+      scene.objects.push(mkCone(x, z, y0 + 0.08, y0 + 0.68, 0.24, 0.07, mat));
+      scene.objects.push(mkSphere(x, y0 + 0.75, z, 0.1, mat));
+      break;
+    case 'knight':
+      scene.objects.push(mkCyl(x, z, y0 + 0.08, y0 + 0.42, 0.19, mat));
+      scene.objects.push(mkSphere(x, y0 + 0.52, z, 0.17, mat));
+      scene.objects.push(mkSphere(x + 0.14, y0 + 0.66, z, 0.11, mat));
+      break;
+    case 'queen':
+      scene.objects.push(mkCone(x, z, y0 + 0.08, y0 + 0.76, 0.27, 0.1, mat));
+      scene.objects.push(mkSphere(x, y0 + 0.84, z, 0.14, mat));
+      scene.objects.push(mkSphere(x, y0 + 0.96, z, 0.06, mat));
+      break;
+    case 'king':
+      scene.objects.push(mkCone(x, z, y0 + 0.08, y0 + 0.78, 0.27, 0.11, mat));
+      scene.objects.push(mkSphere(x, y0 + 0.84, z, 0.12, mat));
+      scene.objects.push(mkBox(x, y0 + 1.02, z, 0.035, 0.12, 0.035, 0, mat));
+      scene.objects.push(mkBox(x, y0 + 1.04, z, 0.1, 0.03, 0.035, 0, mat));
+      break;
+    default: // Bauer
+      scene.objects.push(mkCone(x, z, y0 + 0.08, y0 + 0.4, 0.25, 0.11, mat));
+      scene.objects.push(mkSphere(x, y0 + 0.5, z, 0.16, mat));
+  }
 }
 
 function randObjOnFloor(Rl, Rp, pal, spot, allowTypes) {
@@ -1702,7 +2045,8 @@ var ARCH_WEIGHTS = [['classic', 3], ['mix', 2.5], ['columns', 1.5], ['pyramid', 
                     ['floaters', 1.5], ['big', 1.6], ['water', 1.2], ['room', 1.2],
                     ['flake', 1], ['chaos', 1.2], ['helix', 1], ['towers', 1.2],
                     ['encased', 1], ['alien', 1.3], ['rings', 1.4],
-                    ['logo', 1.4], ['csg', 1.3], ['menger', 0.9], ['forest', 1]];
+                    ['logo', 1.4], ['csg', 1.3], ['menger', 0.9], ['forest', 1],
+                    ['terrain', 1.3], ['blobs', 1.2], ['pool', 1.3], ['chess', 1.5], ['mirror', 1]];
 
 // 5×7-Pixelschrift (MSB = linke Spalte)
 var FONT57 = {
@@ -1728,7 +2072,8 @@ function generateScene(seeds, opts) {
   var arch = wpick(Rl, ARCH_WEIGHTS);
   if (opts.arch) arch = opts.arch;
 
-  var sky = makeSky(Rs, pal, { sunset: arch === 'water', alien: arch === 'alien' });
+  var sky = makeSky(Rs, pal, { sunset: arch === 'water' || arch === 'terrain', alien: arch === 'alien',
+    sunny: arch === 'pool', forceType: opts.sky || null, mts: opts.mts, plts: opts.plts, neb: opts.neb });
   var night = !!sky.stars;
 
   var scene = { objects: [], lights: [], sky: sky, fog: null, flare: null, info: {} };
@@ -1741,6 +2086,7 @@ function generateScene(seeds, opts) {
   var floorMat = null;
   var aisle = null; // Kamera-Hinweis der Säulenhalle
   var camHint = null; // bevorzugter Kamerawinkel (z. B. Logo frontal)
+  var customCam = null; // komplett eigene Kamera (Terrain, Pool, Spiegelsaal)
   var roomD = 0;
   var placed = [];
   var maxH = 2, boundR = 6;
@@ -2091,6 +2437,196 @@ function generateScene(seeds, opts) {
       }
       break;
     }
+    case 'terrain': {
+      hasFloor = false;
+      var tAmp = Rl.range(4.5, 8);
+      var tRock = Rp.chance(0.2) ? hsl(Rp.pick(pal.hues), Rp.range(0.35, 0.6), Rp.range(0.3, 0.42))
+                : hsl(Rp.range(0.04, 0.12), Rp.range(0.12, 0.35), Rp.range(0.3, 0.45));
+      var tLow = Rp.chance(0.6) ? hsl(Rp.range(0.24, 0.36), Rp.range(0.3, 0.5), Rp.range(0.28, 0.4))
+               : hsl(Rp.range(0.09, 0.14), Rp.range(0.3, 0.45), Rp.range(0.5, 0.6));
+      var tMat = { tex: { type: 'solid', c1: [1, 1, 1] }, diffuse: 0.95, ambK: 1, specular: 0.06,
+        shine: 12, reflect: 0, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      var T = mkTerrain(34, tAmp, Rl.range(0.16, 0.28), Rl.range(0, 100),
+        tAmp * Rl.range(0.55, 0.75), tRock, scale3(tRock, 0.55), tLow, tMat);
+      scene.objects.push(T);
+      var lakeLevel = 0.02;
+      if (Rl.chance(0.75)) { // See/Meer zwischen den Bergen
+        lakeLevel = tAmp * Rl.range(0.1, 0.22);
+        var lMatT = { tex: { type: 'solid', c1: Rp.chance(0.5) ? [0.04, 0.1, 0.13] : scale3(hsl(Rp.range(0.5, 0.62), 0.7, 0.25), 1) },
+          diffuse: 0.3, ambK: 1, specular: 1, shine: 200,
+          reflect: Rl.range(0.5, 0.7), reflTint: [1, 1, 1], transparency: 0, ior: 1.33, tint: [1, 1, 1] };
+        var lake = mkPlane(0, lakeLevel, 0, 0, 1, 0, lMatT);
+        lake.ripple = [];
+        for (i = 0; i < 3; i++) {
+          var lwa = Rl.next() * Math.PI * 2, lwf = Rl.range(0.8, 3);
+          lake.ripple.push({ fx: Math.cos(lwa) * lwf, fz: Math.sin(lwa) * lwf, amp: Rl.range(0.006, 0.025), ph: Rl.next() * 6.28 });
+        }
+        scene.objects.push(lake);
+      } else {
+        var sandMat = { tex: { type: 'solid', c1: scale3(tLow, 1.1) }, diffuse: 0.9, ambK: 1, specular: 0.1,
+          shine: 15, reflect: 0, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+        scene.objects.push(mkPlane(0, 0.02, 0, 0, 1, 0, sandMat));
+      }
+      if (Rl.chance(0.45)) { // die Bryce-Chromkugel
+        var bsx = Rl.range(-9, 9), bsz = Rl.range(-9, 9), bsr = Rl.range(0.9, 1.6);
+        scene.objects.push(mkSphere(bsx, Math.max(terrainH(T, bsx, bsz), lakeLevel) + bsr + Rl.range(0.6, 2.2), bsz, bsr, matChrome(Rp)));
+      }
+      var tcAng = Rc.next() * Math.PI * 2;
+      var tcDist = Rc.range(13, 24);
+      var tcx = Math.sin(tcAng) * tcDist, tcz = Math.cos(tcAng) * tcDist;
+      customCam = { ex: tcx, ey: Math.max(terrainH(T, tcx, tcz), lakeLevel) + Rc.range(1.5, 5),
+        ez: tcz, lx: -tcx * 0.35 + Rc.range(-3, 3), ly: lakeLevel + tAmp * Rc.range(0.15, 0.5),
+        lz: -tcz * 0.35 + Rc.range(-3, 3), fov: Rc.range(56, 74) };
+      maxH = tAmp;
+      break;
+    }
+    case 'blobs': {
+      var bN = Rl.int(3, 6);
+      var comps = [{ x: 0, y: Rl.range(1.2, 1.8), z: 0, R: Rl.range(1.4, 2), s: 1 }];
+      for (i = 1; i < bN; i++) {
+        var ref = comps[Rl.int(0, comps.length - 1)];
+        var bAng = Rl.next() * Math.PI * 2, bEl = Rl.range(-0.6, 0.9), bD = Rl.range(0.8, 1.7);
+        comps.push({ x: ref.x + Math.cos(bAng) * Math.cos(bEl) * bD,
+          y: Math.max(0.7, ref.y + Math.sin(bEl) * bD),
+          z: ref.z + Math.sin(bAng) * Math.cos(bEl) * bD,
+          R: Rl.range(1, 1.8), s: Rl.range(0.8, 1) });
+      }
+      var bKind = wpick(Rl, [['chrome', 3], ['metal', 1.6], ['glossy', 2]]);
+      var bMat = bKind === 'chrome' ? matChrome(Rp) : bKind === 'metal' ? matMetalTint(Rp) : matGlossy(Rp, pal);
+      scene.objects.push(mkBlob(comps, 0.35, bMat));
+      placed.push({ x: 0, z: 0, r: 3.4 });
+      if (Rl.chance(0.35)) { // zweiter kleiner Klecks
+        var b2x = Rl.range(3.5, 5.5) * (Rl.chance(0.5) ? 1 : -1);
+        var b2z = Rl.range(-3, 3);
+        var comps2 = [];
+        var b2n = Rl.int(2, 3);
+        for (i = 0; i < b2n; i++) {
+          comps2.push({ x: b2x + Rl.range(-0.7, 0.7), y: Rl.range(0.6, 1.4), z: b2z + Rl.range(-0.7, 0.7),
+            R: Rl.range(0.8, 1.2), s: Rl.range(0.8, 1) });
+        }
+        scene.objects.push(mkBlob(comps2, 0.35, Rl.chance(0.5) ? bMat : randMaterial(Rl, Rp, pal)));
+        placed.push({ x: b2x, z: b2z, r: 2 });
+      }
+      maxH = 3.4;
+      boundR = 5;
+      break;
+    }
+    case 'pool': {
+      hasFloor = false;
+      var pDepth = Rl.range(1.6, 2.4);
+      var pw = Rl.range(4, 6), plen = Rl.range(5, 8);
+      var tileHue = Rl.range(0.52, 0.6);
+      var deckMat = { tex: { type: 'checker', c1: [0.86, 0.87, 0.88], c2: hsl(tileHue, Rp.range(0.3, 0.55), Rp.range(0.55, 0.7)),
+          scale: Rl.range(0.4, 0.7), d3: true },
+        diffuse: 0.85, ambK: 1, specular: 0.25, shine: 40,
+        reflect: Rl.range(0.04, 0.14), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      var pfMat = { tex: { type: 'grid', c1: hsl(tileHue, Rp.range(0.5, 0.7), Rp.range(0.5, 0.65)), c2: [0.92, 0.94, 0.96],
+          scale: Rl.range(0.5, 0.8), lw: 0.05,
+          caustic: { f: Rl.range(0.5, 0.9), amp: Rl.range(0.5, 0.95), off: Rl.range(0, 100) } },
+        diffuse: 0.95, ambK: 1, specular: 0.2, shine: 30,
+        reflect: 0, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      scene.objects.push(mkPlane(0, -pDepth, 0, 0, 1, 0, pfMat));
+      var wMatP = { tex: { type: 'solid', c1: [0.1, 0.25, 0.3] }, diffuse: 0.08, ambK: 0.4,
+        specular: 1, shine: 300, reflect: 0,
+        reflTint: [1, 1, 1], transparency: Rl.range(0.86, 0.93), ior: 1.33, tint: [0.75, 0.95, 0.95] };
+      var waterP = mkPlane(0, 0, 0, 0, 1, 0, wMatP);
+      waterP.ripple = [];
+      for (i = 0; i < 3; i++) {
+        var pwa = Rl.next() * Math.PI * 2, pwf = Rl.range(1, 3.5);
+        waterP.ripple.push({ fx: Math.cos(pwa) * pwf, fz: Math.sin(pwa) * pwf, amp: Rl.range(0.008, 0.03), ph: Rl.next() * 6.28 });
+      }
+      scene.objects.push(waterP);
+      var DD = 150, dTop = 0.32, dBot = -pDepth - 1;
+      var dCy = (dTop + dBot) / 2, dHy = (dTop - dBot) / 2;
+      scene.objects.push(mkBox(0, dCy, plen + DD / 2, pw + DD, dHy, DD / 2, 0, deckMat));
+      scene.objects.push(mkBox(0, dCy, -plen - DD / 2, pw + DD, dHy, DD / 2, 0, deckMat));
+      scene.objects.push(mkBox(pw + DD / 2, dCy, 0, DD / 2, dHy, plen, 0, deckMat));
+      scene.objects.push(mkBox(-pw - DD / 2, dCy, 0, DD / 2, dHy, plen, 0, deckMat));
+      if (Rl.chance(0.6)) { // Wasserball
+        var wbR = Rl.range(0.5, 0.8);
+        scene.objects.push(mkSphere(Rl.range(-pw + 1, pw - 1), wbR * 0.35, Rl.range(-plen + 1, plen - 1), wbR, matCheckerObj(Rp, pal)));
+      }
+      if (Rl.chance(0.5)) { // Schwimmring
+        var srR = Rl.range(0.55, 0.8);
+        scene.objects.push(mkTorus(Rl.range(-pw + 1.2, pw - 1.2), 0.04, Rl.range(-plen + 1.2, plen - 1.2),
+          srR, srR * 0.32, Rl.next() * Math.PI, 0, matGlossy(Rp, pal)));
+      }
+      if (Rl.chance(0.4)) { // Kugel am Beckengrund (durchs Wasser sichtbar)
+        var ugR = Rl.range(0.5, 0.9);
+        scene.objects.push(mkSphere(Rl.range(-pw + 1, pw - 1), -pDepth + ugR, Rl.range(-plen + 1, plen - 1), ugR,
+          Rl.chance(0.5) ? matChrome(Rp) : matGlossy(Rp, pal)));
+      }
+      var pcAng = Rc.next() * Math.PI * 2;
+      var pcDist = Rc.range(8, 13);
+      customCam = { ex: Math.sin(pcAng) * pcDist, ey: Rc.range(2.8, 6), ez: Math.cos(pcAng) * pcDist,
+        lx: Rc.range(-1, 1), ly: -0.6, lz: Rc.range(-1, 1), fov: Rc.range(52, 66) };
+      maxH = 1;
+      boundR = Math.max(pw, plen) + 2;
+      break;
+    }
+    case 'chess': {
+      var frameMat = Rl.chance(0.5) ? matWood(Rp, pal) : matMarbleTex(Rp, pal);
+      var sqDark = Rp.chance(0.6) ? [0.09, 0.09, 0.11] : scale3(pal.obj(), 0.3);
+      var sqLight = Rp.chance(0.7) ? [0.88, 0.86, 0.8] : mix3(pal.obj(), [1, 1, 1], 0.6);
+      var boardMat = { tex: { type: 'checker', c1: sqDark, c2: sqLight, scale: 1, d3: true },
+        diffuse: 0.85, ambK: 1, specular: 0.5, shine: 80,
+        reflect: Rl.range(0.12, 0.32), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      scene.objects.push(mkBox(0, 0.18, 0, 4.55, 0.18, 4.55, 0, frameMat));
+      scene.objects.push(mkBox(0, 0.36, 0, 4.02, 0.14, 4.02, 0, boardMat));
+      var setKind = wpick(Rl, [['bw', 2], ['chromegold', 2], ['glasschrome', 1.5], ['palette', 1.5]]);
+      var pieceGlossy = function (c) {
+        return { tex: { type: 'solid', c1: c }, diffuse: 0.75, ambK: 1, specular: 0.85, shine: 110,
+          reflect: 0.14, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      };
+      var whiteMat, blackMat;
+      if (setKind === 'bw') { whiteMat = pieceGlossy([0.95, 0.93, 0.86]); blackMat = pieceGlossy([0.1, 0.1, 0.12]); }
+      else if (setKind === 'chromegold') { whiteMat = matChrome(Rp); blackMat = matMetalTint(Rp); }
+      else if (setKind === 'glasschrome') { whiteMat = matGlass(Rp, pal); blackMat = matChrome(Rp); }
+      else { whiteMat = pieceGlossy(pal.obj()); blackMat = pieceGlossy(scale3(pal.obj(), 0.55)); }
+      var used = {};
+      var pieceN = Rl.int(8, 16);
+      for (i = 0; i < pieceN; i++) {
+        var pc = Rl.int(0, 7), prw = Rl.int(0, 7);
+        var pKey = pc + '_' + prw;
+        if (used[pKey]) continue;
+        used[pKey] = true;
+        var pKind = wpick(Rl, [['pawn', 4], ['rook', 1.5], ['bishop', 1.5], ['knight', 1.5], ['queen', 0.8], ['king', 0.8]]);
+        addChessPiece(scene, pKind, pc - 3.5, prw - 3.5, 0.5, prw < 4 ? whiteMat : blackMat);
+      }
+      if (Rl.chance(0.55)) { // umgefallene Figur neben dem Brett? Nein — Bodenfarbe dunkel edel
+        floorMat = { tex: { type: 'solid', c1: scale3(pal.obj(), 0.35) }, diffuse: 0.8, ambK: 1,
+          specular: 0.4, shine: 60, reflect: Rl.range(0.15, 0.4), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      }
+      placed.push({ x: 0, z: 0, r: 6.8 });
+      maxH = 1.7;
+      boundR = 6.5;
+      break;
+    }
+    case 'mirror': {
+      var mDist = Rl.range(4, 7);
+      var mirMat = { tex: { type: 'solid', c1: [0.03, 0.03, 0.04] }, diffuse: 0.05, ambK: 0.3,
+        specular: 1, shine: 500, reflect: Rl.range(0.85, 0.93), reflTint: [0.96, 0.98, 1],
+        transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      scene.objects.push(mkPlane(0, 0, -mDist, 0, 0, 1, mirMat));
+      scene.objects.push(mkPlane(0, 0, mDist, 0, 0, -1, mirMat));
+      var mN = Rl.int(2, 5);
+      for (i = 0; i < mN; i++) {
+        spot = placeOnFloor(Rl, placed, 0.4, 1.1, Math.min(4.5, mDist - 1.3));
+        if (!spot) break;
+        scene.objects.push(randObjOnFloor(Rl, Rp, pal, spot, ['sphere', 'sphere', 'box', 'torus', 'cone']));
+      }
+      var mSide = Rl.chance(0.5) ? 1 : -1;
+      // schräg auf einen Spiegel schauen → Endlos-Reflexionen sichtbar
+      customCam = { ex: mSide * Rc.range(6, 9), ey: Rc.range(1.2, 2.8), ez: Rc.range(-1.5, 1.5),
+        lx: 0, ly: Rc.range(0.6, 1.4), lz: (Rc.chance(0.5) ? 1 : -1) * mDist * Rc.range(0.35, 0.7),
+        fov: Rc.range(50, 64) };
+      scene.lights.push({ x: 0, y: Rl.range(3, 5), z: 0, col: [1, 0.97, 0.92], rad: 1.2,
+        intensity: Rl.range(0.5, 0.8) });
+      scene.ambient = scale3(scene.ambient, 1.6);
+      maxH = 3;
+      boundR = mDist;
+      break;
+    }
     case 'logo': {
       var word = Rl.pick(LOGO_WORDS);
       var cell = Math.min(0.5, Math.max(0.26, 9.5 / (word.length * 6 - 1)));
@@ -2284,19 +2820,40 @@ function generateScene(seeds, opts) {
     if (caust.length && floor) floor.caust = caust;
   }
 
-  // Nebel
+  // Nebel (Parameter immer ziehen, damit An/Aus-Erzwingen den Seed-Strom nicht verschiebt)
   var fogP = arch === 'columns' ? 0.45 : arch === 'water' ? 0.45 : arch === 'alien' ? 0.5
-           : arch === 'forest' ? 0.75 : night ? 0.18 : 0.22;
-  if (Rs.chance(fogP)) {
-    var halfD = Rs.range(45, 110);
-    scene.fog = { color: mix3(sky.hor, [1, 1, 1], night ? 0 : 0.08), density: 0.693 / halfD };
+           : arch === 'forest' ? 0.75 : arch === 'terrain' ? 0.65 : arch === 'pool' ? 0.05
+           : arch === 'chess' || arch === 'mirror' ? 0.15 : night ? 0.18 : 0.22;
+  var fogRoll = Rs.chance(fogP);
+  var fogHalfD = Rs.range(45, 110);
+  if (opts.fog === 1 || (opts.fog !== 0 && fogRoll)) {
+    scene.fog = { color: mix3(sky.hor, [1, 1, 1], night ? 0 : 0.08), density: 0.693 / fogHalfD };
     scene.info.fog = true;
   }
 
   // Lens Flare (nur wenn Sonne existiert; Sichtbarkeit prüft das UI)
-  if (sun && Rs.chance(0.5)) {
-    scene.flare = { hue: Rs.next(), strength: Rs.range(0.5, 1) };
+  var flareRoll = Rs.chance(0.5);
+  var flareHue = Rs.next(), flareStr = Rs.range(0.5, 1);
+  if (sun && (opts.flare === 1 || (opts.flare !== 0 && flareRoll))) {
+    scene.flare = { hue: flareHue, strength: flareStr };
   }
+
+  // God-Rays (volumetrische Lichtstrahlen)
+  var grRoll = Rs.chance(arch === 'columns' || arch === 'forest' ? 0.3 : 0.07);
+  var grStr = Rs.range(0.09, 0.2), grFall = Rs.range(0.03, 0.07);
+  if (opts.rays === 1 || (opts.rays !== 0 && grRoll)) {
+    scene.godRays = { strength: grStr, fall: grFall };
+    scene.info.rays = true;
+  }
+
+  // Prisma-Dispersion (Regenbogen-Brechung in Glas)
+  var dispRoll = Rs.chance(0.1);
+  var dispAmt = Rs.range(0.01, 0.022);
+  scene.disp = (opts.disp === 1 || (opts.disp !== 0 && dispRoll)) ? dispAmt : 0;
+
+  // Bloom-Empfehlung der Szene (das UI entscheidet im Auto-Modus danach)
+  scene.bloomAuto = Rs.chance(pal.scheme === 'neon' || night ? 0.55 : 0.3);
+  scene.bloomAmt = Rs.range(0.5, 0.85);
 
   // Kamera
   var cam;
@@ -2304,6 +2861,8 @@ function generateScene(seeds, opts) {
     cam = { ex: Rc.range(-1.6, 1.6), ey: Rc.range(1.2, 3.4), ez: Rc.range(3.5, 6.5),
       lx: Rc.range(-0.5, 0.5), ly: Rc.range(0.8, 2), lz: -aisle.sp * aisle.rows * 0.5,
       fov: Rc.range(48, 66) };
+  } else if (customCam) {
+    cam = customCam;
   } else {
     var bR = boundR, bH = maxH;
     for (i = 0; i < scene.objects.length; i++) {
@@ -2326,17 +2885,18 @@ function generateScene(seeds, opts) {
       fov: Rc.range(42, 68) };
   }
   // Kamera darf nicht in einem Objekt stecken
+  if (hasFloor && cam.ey < 0.3) cam.ey = 0.5;
   for (var iter = 0; iter < 8; iter++) {
     var stuck = false;
     for (i = 0; i < scene.objects.length; i++) {
-      o = scene.objects[i];
-      if (o.type === 'plane') { if (cam.ey < 0.3) cam.ey = 0.5; continue; }
-      var dxs = cam.ex - o.cx, dys = cam.ey - o.cy, dzs = cam.ez - o.cz;
-      if (dxs * dxs + dys * dys + dzs * dzs < (o.bound + 0.5) * (o.bound + 0.5)) { stuck = true; break; }
+      if (cameraInside(scene.objects[i], cam.ex, cam.ey, cam.ez, 0.45)) { stuck = true; break; }
     }
     if (!stuck) break;
     cam.ex *= 1.18; cam.ez *= 1.18; cam.ey += 0.4;
   }
+  // Fischauge (Weitwinkel-Verzerrung)
+  var fishRoll = Rs.chance(0.03);
+  cam.fisheye = opts.fish === 1 || (opts.fish !== 0 && fishRoll);
   scene.cam = cam;
   return scene;
 }
@@ -2383,11 +2943,23 @@ function createRenderer(scene, W, H, mode) {
   var invG = 1 / 2.2;
 
   function sampleAt(x, y, sx, sy) {
+    var dx, dy, dz;
+    if (cam.fisheye) {
+      var nx2 = (2 * (x + sx) / W - 1) * aspect;
+      var ny2 = 1 - 2 * (y + sy) / H;
+      var rr2 = Math.sqrt(nx2 * nx2 + ny2 * ny2) + 1e-9;
+      var th = rr2 * cam.fov * 0.017453 * 0.75;
+      var sth = Math.sin(th) / rr2, cth = Math.cos(th);
+      dx = fx * cth + (rx * nx2 + ux * ny2) * sth;
+      dy = fy * cth + (ry * nx2 + uy * ny2) * sth;
+      dz = fz * cth + (rz * nx2 + uz * ny2) * sth;
+      return trace(scene, cam.ex, cam.ey, cam.ez, dx, dy, dz, 0, 1);
+    }
     var u = (2 * (x + sx) / W - 1) * tanF * aspect;
     var v = (1 - 2 * (y + sy) / H) * tanF;
-    var dx = fx + rx * u + ux * v;
-    var dy = fy + ry * u + uy * v;
-    var dz = fz + rz * u + uz * v;
+    dx = fx + rx * u + ux * v;
+    dy = fy + ry * u + uy * v;
+    dz = fz + rz * u + uz * v;
     var dl = 1 / Math.sqrt(dx * dx + dy * dy + dz * dz);
     return trace(scene, cam.ex, cam.ey, cam.ez, dx * dl, dy * dl, dz * dl, 0, 1);
   }
@@ -2566,6 +3138,126 @@ function applyColorGrade(data, W, H, sat, con) {
     data[i] = r * 255;
     data[i + 1] = g * 255;
     data[i + 2] = b * 255;
+  }
+}
+
+// ---------------------------------------------------------------- Bloom / Glow
+function applyBloom(data, W, H, strength) {
+  var sw = Math.max(8, W >> 2), sh = Math.max(8, H >> 2);
+  var small = new Float32Array(sw * sh * 3);
+  var tmp = new Float32Array(sw * sh * 3);
+  var thr = 195;
+  var x, y, i2, j, o3, o4;
+  for (y = 0; y < sh; y++) {
+    for (x = 0; x < sw; x++) {
+      var sr = 0, sg = 0, sb = 0;
+      for (j = 0; j < 4; j++) {
+        for (i2 = 0; i2 < 4; i2++) {
+          var px2 = Math.min(W - 1, x * 4 + i2), py2 = Math.min(H - 1, y * 4 + j);
+          o4 = (py2 * W + px2) * 4;
+          sr += data[o4]; sg += data[o4 + 1]; sb += data[o4 + 2];
+        }
+      }
+      sr /= 16; sg /= 16; sb /= 16;
+      var lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+      var k = lum > thr ? (lum - thr) / (255 - thr) : 0;
+      o3 = (y * sw + x) * 3;
+      small[o3] = sr * k; small[o3 + 1] = sg * k; small[o3 + 2] = sb * k;
+    }
+  }
+  var rad = Math.max(2, Math.round(sw / 34));
+  for (var pass = 0; pass < 3; pass++) {
+    for (y = 0; y < sh; y++) { // horizontal
+      for (x = 0; x < sw; x++) {
+        var ar = 0, ag = 0, ab = 0, cnt = 0;
+        for (i2 = -rad; i2 <= rad; i2++) {
+          var xx = x + i2;
+          if (xx < 0 || xx >= sw) continue;
+          o3 = (y * sw + xx) * 3;
+          ar += small[o3]; ag += small[o3 + 1]; ab += small[o3 + 2]; cnt++;
+        }
+        o3 = (y * sw + x) * 3;
+        tmp[o3] = ar / cnt; tmp[o3 + 1] = ag / cnt; tmp[o3 + 2] = ab / cnt;
+      }
+    }
+    for (y = 0; y < sh; y++) { // vertikal
+      for (x = 0; x < sw; x++) {
+        var br = 0, bg = 0, bb = 0, cnt2 = 0;
+        for (i2 = -rad; i2 <= rad; i2++) {
+          var yy = y + i2;
+          if (yy < 0 || yy >= sh) continue;
+          o3 = (yy * sw + x) * 3;
+          br += tmp[o3]; bg += tmp[o3 + 1]; bb += tmp[o3 + 2]; cnt2++;
+        }
+        o3 = (y * sw + x) * 3;
+        small[o3] = br / cnt2; small[o3 + 1] = bg / cnt2; small[o3 + 2] = bb / cnt2;
+      }
+    }
+  }
+  for (y = 0; y < H; y++) { // bilinear hochskalieren, additiv
+    var fy = Math.min(sh - 1.001, y / 4);
+    var iy = fy | 0, uy = fy - iy;
+    for (x = 0; x < W; x++) {
+      var fx = Math.min(sw - 1.001, x / 4);
+      var ix = fx | 0, ux = fx - ix;
+      var b0 = (iy * sw + ix) * 3, b1 = b0 + 3, b2 = b0 + sw * 3, b3 = b2 + 3;
+      o4 = (y * W + x) * 4;
+      for (var ch = 0; ch < 3; ch++) {
+        var v = small[b0 + ch] * (1 - ux) * (1 - uy) + small[b1 + ch] * ux * (1 - uy)
+              + small[b2 + ch] * (1 - ux) * uy + small[b3 + ch] * ux * uy;
+        data[o4 + ch] = data[o4 + ch] + v * strength;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- Retro-Bildunterschrift
+var FONT_EXTRA = {
+  '0': [14, 17, 19, 21, 25, 17, 14], '1': [4, 12, 4, 4, 4, 4, 14], '2': [14, 17, 1, 2, 4, 8, 31],
+  '3': [30, 1, 1, 14, 1, 1, 30], '4': [2, 6, 10, 18, 31, 2, 2], '5': [31, 16, 30, 1, 1, 17, 14],
+  '6': [6, 8, 16, 30, 17, 17, 14], '7': [31, 1, 2, 4, 8, 8, 8], '8': [14, 17, 17, 14, 17, 17, 14],
+  '9': [14, 17, 17, 15, 1, 2, 12], '.': [0, 0, 0, 0, 0, 12, 12], '-': [0, 0, 0, 14, 0, 0, 0],
+  ':': [0, 12, 12, 0, 12, 12, 0], ' ': [0, 0, 0, 0, 0, 0, 0]
+};
+function drawCaption(data, W, H, text) {
+  var s = Math.max(1, Math.round(W / 420));
+  var pad = 4 * s;
+  var barH = 7 * s + pad * 2;
+  var y0 = H - barH;
+  var x, y, o;
+  for (y = y0; y < H; y++) {
+    for (x = 0; x < W; x++) {
+      o = (y * W + x) * 4;
+      data[o] *= 0.28; data[o + 1] *= 0.28; data[o + 2] *= 0.28;
+    }
+  }
+  text = text.toUpperCase();
+  var cx = pad;
+  for (var ci = 0; ci < text.length && cx < W - 6 * s; ci++) {
+    var gl = FONT57[text[ci]] || FONT_EXTRA[text[ci]];
+    if (gl) {
+      for (var r = 0; r < 7; r++) {
+        for (var c = 0; c < 5; c++) {
+          if (gl[r] & (16 >> c)) {
+            for (var sy = 0; sy < s; sy++) {
+              for (var sx = 0; sx < s; sx++) {
+                o = ((y0 + pad + r * s + sy) * W + cx + c * s + sx) * 4;
+                data[o] = 110; data[o + 1] = 255; data[o + 2] = 130; // Phosphor-Grün
+              }
+            }
+          }
+        }
+      }
+    }
+    cx += 6 * s;
+  }
+}
+
+// ---------------------------------------------------------------- Anaglyph (Rot/Cyan)
+function mergeAnaglyph(left, right, n) { // Rot = linkes Auge, Grün/Blau = rechtes (in-place in left)
+  for (var i = 0; i < n; i += 4) {
+    left[i + 1] = right[i + 1];
+    left[i + 2] = right[i + 2];
   }
 }
 
@@ -2900,7 +3592,8 @@ var RT90 = {
   generateScene: generateScene, createRenderer: createRenderer,
   deriveSeeds: deriveSeeds, parseSeedInput: parseSeedInput, seedsToStr: seedsToStr,
   projectSun: projectSun, applyLensFlare: applyLensFlare, applyAnim: applyAnim,
-  applyColorGrade: applyColorGrade,
+  applyColorGrade: applyColorGrade, applyBloom: applyBloom, drawCaption: drawCaption,
+  mergeAnaglyph: mergeAnaglyph, camBasis: camBasis,
   quantizeDither: quantizeDither, gifEncode: gifEncode, zipStore: zipStore, webmMux: webmMux,
   ARCHS: ARCH_WEIGHTS.map(function (a) { return a[0]; }),
   STATS: STATS
@@ -2928,6 +3621,43 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   var palSel = document.getElementById('palSel');
   var histStrip = document.getElementById('histStrip');
   var favStrip = document.getElementById('favStrip');
+
+  // Effekte-Panel: Auto/An/Aus-Auswahl
+  var fxSky = document.getElementById('fxSky');
+  var fxAna = document.getElementById('fxAna');
+  var fxFrame = document.getElementById('fxFrame');
+  var TRI_KEYS = { fog: 'fxFog', mts: 'fxMts', plts: 'fxPlts', neb: 'fxNeb',
+    flare: 'fxFlare', rays: 'fxRays', disp: 'fxDisp', bloom: 'fxBloom', fish: 'fxFish' };
+  var triSel = {};
+  Object.keys(TRI_KEYS).forEach(function (k) {
+    var sel = document.getElementById(TRI_KEYS[k]);
+    sel.innerHTML = '<option value="">Auto</option><option value="1">An</option><option value="0">Aus</option>';
+    triSel[k] = sel;
+  });
+  function fxString() {
+    var parts = [];
+    if (fxSky.value) parts.push('sky=' + fxSky.value);
+    Object.keys(triSel).forEach(function (k) {
+      if (triSel[k].value) parts.push(k + '=' + triSel[k].value);
+    });
+    if (fxAna.checked) parts.push('ana=1');
+    if (fxFrame.checked) parts.push('frame=1');
+    return parts.join(',');
+  }
+  function applyFxString(str) {
+    fxSky.value = '';
+    Object.keys(triSel).forEach(function (k) { triSel[k].value = ''; });
+    fxAna.checked = false;
+    fxFrame.checked = false;
+    (str || '').split(',').forEach(function (p) {
+      var kv = p.split('=');
+      if (kv.length !== 2) return;
+      if (kv[0] === 'sky') fxSky.value = kv[1];
+      else if (kv[0] === 'ana') fxAna.checked = kv[1] === '1';
+      else if (kv[0] === 'frame') fxFrame.checked = kv[1] === '1';
+      else if (triSel[kv[0]]) triSel[kv[0]].value = kv[1];
+    });
+  }
 
   function fmtInt(n) { return n.toLocaleString('de-DE'); }
 
@@ -3069,10 +3799,17 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     var o = {};
     if (archSel.value) o.arch = archSel.value;
     if (palSel.value) o.pal = palSel.value;
+    if (fxSky.value) o.sky = fxSky.value;
+    ['fog', 'mts', 'plts', 'neb', 'flare', 'rays', 'disp', 'fish'].forEach(function (k) {
+      if (triSel[k].value === '1') o[k] = 1;
+      else if (triSel[k].value === '0') o[k] = 0;
+    });
     return o;
   }
   function optsToHash(opts) {
-    return (opts.arch || opts.pal) ? ';' + (opts.arch || '') + ';' + (opts.pal || '') : '';
+    var fx = fxString();
+    if (!opts.arch && !opts.pal && !fx) return '';
+    return ';' + (opts.arch || '') + ';' + (opts.pal || '') + (fx ? ';' + fx : '');
   }
   function newMaster() { return (Math.random() * 4294967296) >>> 0; }
   function cancelAuto() { if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; } }
@@ -3106,23 +3843,24 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     var t0 = performance.now();
     statusEl.textContent = 'Rendere …';
 
-    renderImage(parsed.seeds, opts, W, H, mode, null, null, function (img, y0, y1, done, total, rays) {
+    var isCanc = function () { return token !== renderToken; };
+    var progressCb = function (img, y0, y1, done, total, rays) {
       if (token !== renderToken) return;
       ctx.putImageData(img, 0, 0, 0, y0, W, y1 - y0);
       var el = (performance.now() - t0) / 1000;
       statusEl.textContent = 'Rendere … ' + Math.round(done / total * 100) + ' %' + (pool && !pool.failed ? ' (' + pool.workers.length + ' Threads)' : '');
       statsEl.textContent = el.toFixed(1) + ' s — ' + fmtInt(rays) + ' Strahlen';
-    }, function () { return token !== renderToken; }).then(function (result) {
+    };
+    var finish = function (result) {
       if (token !== renderToken || !result) return;
-      // Lens Flare einbrennen
-      if (scene.flare) {
+      if (scene.flare && !fxAna.checked) { // Lens Flare einbrennen
         var sp = RT90.projectSun(scene, W, H);
         if (sp) RT90.applyLensFlare(result.data, W, H, sp.x, sp.y, scene.flare);
       }
       lastMaster = result;
       presentImage();
       var el = (performance.now() - t0) / 1000;
-      statusEl.textContent = 'Fertig. (' + scene.info.arch + ' / ' + scene.info.sky + ' / ' + scene.info.pal + (scene.info.fog ? ' / Nebel' : '') + ')';
+      statusEl.textContent = 'Fertig. (' + scene.info.arch + ' / ' + scene.info.sky + ' / ' + scene.info.pal + (scene.info.fog ? ' / Nebel' : '') + (scene.info.rays ? ' / God-Rays' : '') + ')';
       statsEl.textContent = el.toFixed(1) + ' s';
       pushHistory();
       if (autoChk.checked) {
@@ -3130,19 +3868,49 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
           if (token === renderToken && autoChk.checked && !busy) newImage();
         }, 3500);
       }
-    });
+    };
+    if (fxAna.checked) { // Anaglyph: zwei Augen, Rot links / Cyan rechts
+      var b = RT90.camBasis(scene.cam, W, H);
+      var adx = scene.cam.lx - scene.cam.ex, ady = scene.cam.ly - scene.cam.ey, adz = scene.cam.lz - scene.cam.ez;
+      var sep = Math.sqrt(adx * adx + ady * ady + adz * adz) * 0.022;
+      var eyeCam = function (sgn) {
+        return { ex: scene.cam.ex + b.rx * sep * sgn, ey: scene.cam.ey + b.ry * sep * sgn,
+          ez: scene.cam.ez + b.rz * sep * sgn, lx: scene.cam.lx, ly: scene.cam.ly, lz: scene.cam.lz,
+          fov: scene.cam.fov, fisheye: scene.cam.fisheye };
+      };
+      renderImage(parsed.seeds, opts, W, H, mode, eyeCam(-1), null, progressCb, isCanc).then(function (L) {
+        if (token !== renderToken || !L) return;
+        statusEl.textContent = 'Anaglyph: rechtes Auge …';
+        renderImage(parsed.seeds, opts, W, H, mode, eyeCam(1), null, progressCb, isCanc).then(function (Rr) {
+          if (token !== renderToken || !Rr) return;
+          RT90.mergeAnaglyph(L.data, Rr.data, W * H * 4);
+          finish(L);
+        });
+      });
+    } else {
+      renderImage(parsed.seeds, opts, W, H, mode, null, null, progressCb, isCanc).then(finish);
+    }
   }
-  // Zeigt lastMaster an, wendet ggf. Farb-Grading und 256-Farben-Dithering an
+  function captionText() {
+    var s0 = current.seeds ? current.seeds[0] : 0;
+    return 'RAYTRACE 95 - SEED ' + (current.display || '') + ' - ' + (s0 % 23 + 1) + 'H ' + (s0 % 60) + 'MIN';
+  }
+  // Bloom / Farb-Grading / Retro-Rahmen (in-place)
+  function postProcess(img, scene) {
+    var W = img.width, H = img.height;
+    var bloomOn = triSel.bloom.value === '1' || (triSel.bloom.value === '' && scene && scene.bloomAuto);
+    if (bloomOn) RT90.applyBloom(img.data, W, H, scene ? scene.bloomAmt : 0.6);
+    if (vividChk.checked) RT90.applyColorGrade(img.data, W, H, VIVID_SAT, VIVID_CON);
+    if (fxFrame.checked) RT90.drawCaption(img.data, W, H, captionText());
+  }
+  // Zeigt lastMaster an: Bloom → Grading → Rahmen → ggf. 256 Farben
   function presentImage() {
     if (!lastMaster) return;
     var W = lastMaster.width, H = lastMaster.height;
     if (cv.width !== W || cv.height !== H) setCanvasSize(W, H);
-    var work = lastMaster;
-    if (vividChk.checked) {
-      work = new ImageData(W, H);
-      work.data.set(lastMaster.data);
-      RT90.applyColorGrade(work.data, W, H, VIVID_SAT, VIVID_CON);
-    }
+    var work = new ImageData(W, H);
+    work.data.set(lastMaster.data);
+    postProcess(work, lastScene);
     if (ditherChk.checked) {
       var q = RT90.quantizeDither(work.data, W, H);
       var di = new ImageData(W, H);
@@ -3178,7 +3946,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     tc.getContext('2d').drawImage(cv, 0, 0, tw, th);
     return tc.toDataURL('image/jpeg', 0.72);
   }
-  function entryKey(e) { return e.s + '|' + (e.a || '') + '|' + (e.p || ''); }
+  function entryKey(e) { return e.s + '|' + (e.a || '') + '|' + (e.p || '') + '|' + (e.f || ''); }
   function renderStrip(el, list, storageKey) {
     el.innerHTML = '';
     list.forEach(function (e, i) {
@@ -3204,7 +3972,8 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       d.addEventListener('click', function () {
         archSel.value = e.a || '';
         palSel.value = e.p || '';
-        startRender(RT90.parseSeedInput(e.s), { arch: e.a || undefined, pal: e.p || undefined });
+        applyFxString(e.f || '');
+        startRender(RT90.parseSeedInput(e.s));
       });
       el.appendChild(d);
     });
@@ -3214,7 +3983,8 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     renderStrip(favStrip, loadList('rt95_favs'), 'rt95_favs');
   }
   function pushHistory() {
-    var e = { s: RT90.seedsToStr(current.seeds), a: current.opts.arch || '', p: current.opts.pal || '', d: makeThumb() };
+    var e = { s: RT90.seedsToStr(current.seeds), a: current.opts.arch || '', p: current.opts.pal || '',
+      f: fxString(), d: makeThumb() };
     var list = loadList('rt95_hist').filter(function (o) { return entryKey(o) !== entryKey(e); });
     list.unshift(e);
     if (list.length > 16) list.length = 16;
@@ -3223,7 +3993,8 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   }
   function addFavorite() {
     if (!current.seeds) return;
-    var e = { s: RT90.seedsToStr(current.seeds), a: current.opts.arch || '', p: current.opts.pal || '', d: makeThumb() };
+    var e = { s: RT90.seedsToStr(current.seeds), a: current.opts.arch || '', p: current.opts.pal || '',
+      f: fxString(), d: makeThumb() };
     var list = loadList('rt95_favs').filter(function (o) { return entryKey(o) !== entryKey(e); });
     list.unshift(e);
     if (list.length > 30) list.length = 30;
@@ -3275,7 +4046,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
           var sp = RT90.projectSun(scene, W, H);
           if (sp) RT90.applyLensFlare(img.data, W, H, sp.x, sp.y, scene.flare);
         }
-        if (vividChk.checked) RT90.applyColorGrade(img.data, W, H, VIVID_SAT, VIVID_CON);
+        postProcess(img, scene);
         var show = img;
         if (ditherChk.checked) {
           var q = RT90.quantizeDither(img.data, W, H);
@@ -3404,7 +4175,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
           var sp = RT90.projectSun(sc2, W, H);
           if (sp) RT90.applyLensFlare(img.data, W, H, sp.x, sp.y, baseScene.flare);
         }
-        if (vividChk.checked) RT90.applyColorGrade(img.data, W, H, VIVID_SAT, VIVID_CON);
+        postProcess(img, baseScene);
         var show = img;
         if (fmt === 'gif' || ditherChk.checked) {
           var q = RT90.quantizeDither(img.data, W, H);
@@ -3464,7 +4235,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
         var added = 0;
         arr.forEach(function (e) {
           if (e && typeof e.s === 'string' && typeof e.d === 'string' && !have[entryKey(e)]) {
-            list.push({ s: e.s, a: e.a || '', p: e.p || '', d: e.d });
+            list.push({ s: e.s, a: e.a || '', p: e.p || '', f: e.f || '', d: e.d });
             have[entryKey(e)] = true;
             added++;
           }
@@ -3502,6 +4273,17 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   vividChk.addEventListener('change', function () { if (!busy) presentImage(); });
   archSel.addEventListener('change', function () { newImage(); });
   palSel.addEventListener('change', function () { newImage(); });
+  function rerenderCurrent() {
+    if (current.seeds) startRender({ seeds: current.seeds, display: current.display });
+    else newImage();
+  }
+  fxSky.addEventListener('change', rerenderCurrent);
+  ['fog', 'mts', 'plts', 'neb', 'flare', 'rays', 'disp', 'fish'].forEach(function (k) {
+    triSel[k].addEventListener('change', rerenderCurrent);
+  });
+  triSel.bloom.addEventListener('change', function () { if (!busy) presentImage(); });
+  fxAna.addEventListener('change', rerenderCurrent);
+  fxFrame.addEventListener('change', function () { if (!busy) presentImage(); });
   autoChk.addEventListener('change', function () {
     cancelAuto();
     if (autoChk.checked && !busy) newImage();
@@ -3520,6 +4302,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     var segs = h.split(';');
     if (segs[1] !== undefined) archSel.value = segs[1] || '';
     if (segs[2] !== undefined) palSel.value = segs[2] || '';
+    if (segs[3] !== undefined) applyFxString(segs[3]);
     startRender(RT90.parseSeedInput(segs[0]));
   } else {
     newImage();

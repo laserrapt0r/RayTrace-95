@@ -15,6 +15,11 @@ Abhängigkeiten — einfach `index.html` im Browser öffnen, kein Server nötig.
   funktioniert ebenfalls als Master-Seed. Der Seed steht auch in der URL —
   Link kopieren genügt zum Teilen.
 - **Szene/Palette**: erzwingt einen bestimmten Archetyp bzw. ein Farbschema.
+- **Effekte-Panel**: Himmel, Nebel, Berge, Planeten, Gasnebel, Lens Flare,
+  God-Rays, Prisma-Dispersion, Bloom und Fischauge sind einzeln per
+  Auto/An/Aus wählbar; dazu Anaglyph 3D (Rot/Cyan) und ein Retro-Rahmen mit
+  eingebrannter Bildunterschrift. Alle Einstellungen wandern in den
+  Teilen-Link und in die Favoriten.
 - **Qualität**: Schnell (1 Strahl/Pixel) · Adaptiv (Kantenglättung nur an
   Kanten) · Maximal (4× überall) · Ultra (zusätzlich weiche Schatten).
 - **Knallige Farben** (Standard: an): Sättigungs-Boost + Kontrast-S-Kurve als
@@ -39,16 +44,24 @@ Objekte, Zentralkugel, Wasser, Innenraum, Sphereflake, Helix, Türme,
 Glasbox, fremde Welt (Planeten, Monolith, UFO), Ringe/Tori, Logo-Schriftzug
 (3D-Buchstaben aus einer 5×7-Pixelschrift), Würfel & Co (CSG: Spielwürfel
 mit Augen, angebissene Würfel, Schalen, Rohre), Menger-Schwamm und
-Säulenwald — kombiniert mit 7 Farbschemata (inkl. reiner
-POV-Ray-Primärfarben), 6 Himmelstypen (inkl. Wolken,
-Sternen, Silhouetten-Bergen und Planeten mit Ringen), Nebel, Lens Flare
+Säulenwald, Berglandschaft (echtes Raymarching-Heightfield mit Schnee,
+See und schwebender Chromkugel — der Bryce-Look), Blobs/Metaballs,
+Schwimmbad (transparentes Wasser über gekacheltem Becken mit
+Kaustik-Lichtnetz), Schachbrett mit Figuren und Spiegelsaal mit
+Endlos-Reflexionen — kombiniert mit 7 Farbschemata (inkl. reiner
+POV-Ray-Primärfarben), 6 Himmelstypen (inkl. Wolken, Sternen, Gasnebeln,
+Silhouetten-Bergen und Planeten mit Ringen), Nebel, God-Rays, Lens Flare
 und Fake-Kaustiken unter Glasobjekten.
 
 ## Technik
 
 - Rekursiver Raytracer in reinem JavaScript: Kugel, Ebene, Box (rotiert),
-  Zylinder, Kegel, **Torus** (Quartic-Löser nach Graphics Gems) und
-  **CSG** (Differenz/Schnitt konvexer Körper über Intervall-Arithmetik).
+  Zylinder, Kegel, **Torus** (Quartic-Löser nach Graphics Gems),
+  **CSG** (Differenz/Schnitt konvexer Körper über Intervall-Arithmetik),
+  **Heightfield-Terrain** (Grid-basiertes Raymarching) und
+  **Blobs/Metaballs** (Feld-Marching mit analytischen Normalen).
+- Effekte: volumetrische God-Rays, Prisma-Dispersion (Brechung pro
+  Farbkanal), Bloom/Glow, Anaglyph 3D, Fischaugen-Projektion.
 - Spiegelung, Brechung mit Fresnel (Schlick), farbige Glas-Schatten,
   prozedurale Texturen (Schachbrett, Marmor, Holz, Bozo, Streifen, Grid),
   Bump-Mapping, Distanz-Fade gegen Moiré.

@@ -95,9 +95,15 @@ if (!outDir || !specs.length) {
 }
 fs.mkdirSync(outDir, { recursive: true });
 for (const spec of specs) {
-  const [seedStr, arch] = spec.split(':');
+  const [seedStr, arch, fx] = spec.split(':');
   const parsed = RT90.parseSeedInput(seedStr);
   const opts = arch ? { arch } : {};
+  if (fx) { // z. B. 42:forest:rays=1,sky=sunset
+    for (const p of fx.split(',')) {
+      const [k, v] = p.split('=');
+      opts[k] = k === 'sky' ? v : Number(v);
+    }
+  }
   const t0 = Date.now();
   const scene = RT90.generateScene(parsed.seeds, opts);
   const r = RT90.createRenderer(scene, W, H, MODE);
@@ -108,10 +114,14 @@ for (const spec of specs) {
     const sp = RT90.projectSun(scene, W, H);
     if (sp) { RT90.applyLensFlare(buf, W, H, sp.x, sp.y, scene.flare); flareTxt = ' / flare'; }
   }
+  if (process.env.BLOOM === '1' || (process.env.BLOOM !== '0' && scene.bloomAuto)) {
+    RT90.applyBloom(buf, W, H, scene.bloomAmt || 0.6);
+  }
   if (process.env.NOGRADE !== '1') RT90.applyColorGrade(buf, W, H, 1.35, 0.25);
+  if (process.env.FRAME === '1') RT90.drawCaption(buf, W, H, 'RAYTRACE 95 - SEED ' + seedStr + ' - 14H 23MIN');
   let out = buf;
   if (process.env.DITHER === '1') out = RT90.quantizeDither(buf, W, H).rgba;
-  const name = `s${seedStr}${arch ? '_' + arch : ''}` +
+  const name = `s${seedStr}${arch ? '_' + arch : ''}${fx ? '_' + fx.replace(/[^\w]/g, '') : ''}` +
     `${process.env.DITHER === '1' ? '_d' : ''}${process.env.NOGRADE === '1' ? '_flat' : ''}`;
   writePNG(path.join(outDir, name + '.png'), W, H, out);
   console.log(`${spec}: ${scene.info.arch} / ${scene.info.sky} / ${scene.info.pal}` +
