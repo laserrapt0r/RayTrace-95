@@ -1,0 +1,19 @@
+# Editor / IDE
+*.code-workspace
+.vscode/
+.idea/
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Render-Ausgaben des Testwerkzeugs (docs/ ist bewusst eingecheckt)
+out/
+out*/
+render-out/
+*.tmp
