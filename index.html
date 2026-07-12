@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RayTrace ’95 — Zufällige 90er-Raytracing-Bilder</title>
+<title>RayTrace ’95 — Random 90s Raytracing Images</title>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -146,18 +146,18 @@
 <div class="window">
   <div class="titlebar">
     <span>◆</span>
-    <span class="tname">RayTrace ’95 — <span id="titleSeed">unbenannt.pov</span></span>
+    <span class="tname">RayTrace ’95 — <span id="titleSeed">untitled.pov</span></span>
     <span class="tbtns"><span>_</span><span>□</span><span>×</span></span>
   </div>
   <div class="toolbar">
-    <button id="btnNew" title="Leertaste">Neues Bild</button>
-    <button id="btnSave">PNG speichern</button>
-    <button id="btnFav" title="Aktuelles Bild zu Favoriten">★ Favorit</button>
+    <button id="btnNew" data-i18n="btnNew" data-i18n-title="btnNewT">New image</button>
+    <button id="btnSave" data-i18n="btnSave">Save PNG</button>
+    <button id="btnFav" data-i18n="btnFav" data-i18n-title="btnFavT">★ Favourite</button>
     <span class="sep"></span>
-    <label>Seed: <input type="text" id="seedInput" spellcheck="false"></label>
-    <button id="btnSeed">Rendern</button>
+    <label><span data-i18n="lblSeed">Seed:</span> <input type="text" id="seedInput" spellcheck="false"></label>
+    <button id="btnSeed" data-i18n="btnRender">Render</button>
     <span class="sep"></span>
-    <label>Größe:
+    <label><span data-i18n="lblSize">Size:</span>
       <select id="sizeSel">
         <option value="320x240">320 × 240</option>
         <option value="640x480" selected>640 × 480</option>
@@ -169,172 +169,172 @@
         <option value="3840x2160">3840 × 2160 (4K)</option>
       </select>
     </label>
-    <label>Qualität:
+    <label><span data-i18n="lblQual">Quality:</span>
       <select id="qualSel">
-        <option value="0">Schnell</option>
-        <option value="1" selected>Adaptiv</option>
-        <option value="2">Maximal</option>
-        <option value="3">Ultra (weiche Schatten)</option>
+        <option value="0" data-i18n="qualFast">Fast</option>
+        <option value="1" selected data-i18n="qualAdaptive">Adaptive</option>
+        <option value="2" data-i18n="qualMax">Maximum</option>
+        <option value="3" data-i18n="qualUltra">Ultra (soft shadows)</option>
       </select>
     </label>
-    <label class="cb"><input type="checkbox" id="ditherChk"> 256 Farben</label>
-    <label class="cb"><input type="checkbox" id="autoChk"> Auto-Diashow</label>
+    <label class="cb"><input type="checkbox" id="ditherChk"> <span data-i18n="chkDither">256 colours</span></label>
+    <label class="cb"><input type="checkbox" id="autoChk"> <span data-i18n="chkAuto">Auto slideshow</span></label>
   </div>
   <div class="toolbar">
-    <span class="lbl">Bild:</span>
-    <label>Farbintensität:
+    <span class="lbl" data-i18n="grpImage">Image:</span>
+    <label><span data-i18n="lblGrade">Colour intensity:</span>
       <select id="gradeSel">
-        <option value="off">Aus (roh)</option>
-        <option value="soft">Dezent</option>
-        <option value="normal" selected>Normal</option>
-        <option value="strong">Stark</option>
-        <option value="extreme">Extrem</option>
+        <option value="off" data-i18n="gradeOff">Off (raw)</option>
+        <option value="soft" data-i18n="gradeSoft">Subtle</option>
+        <option value="normal" selected data-i18n="gradeNormal">Normal</option>
+        <option value="strong" data-i18n="gradeStrong">Strong</option>
+        <option value="extreme" data-i18n="gradeExtreme">Extreme</option>
       </select>
     </label>
-    <label>Helligkeit:
+    <label><span data-i18n="lblExpo">Brightness:</span>
       <select id="expoSel">
-        <option value="dark">Dunkler</option>
-        <option value="normal" selected>Normal</option>
-        <option value="bright">Heller</option>
-        <option value="bright2">Sehr hell</option>
+        <option value="dark" data-i18n="expoDark">Darker</option>
+        <option value="normal" selected data-i18n="expoNormal">Normal</option>
+        <option value="bright" data-i18n="expoBright">Brighter</option>
+        <option value="bright2" data-i18n="expoBright2">Very bright</option>
       </select>
     </label>
-    <label>Spiegelung:
+    <label><span data-i18n="lblRefl">Reflections:</span>
       <select id="reflSel">
-        <option value="1" selected>Normal</option>
-        <option value="0.5">Schwach</option>
-        <option value="1.5">Stark</option>
-        <option value="2">Sehr stark</option>
+        <option value="1" selected data-i18n="reflNormal">Normal</option>
+        <option value="0.5" data-i18n="reflWeak">Weak</option>
+        <option value="1.5" data-i18n="reflStrong">Strong</option>
+        <option value="2" data-i18n="reflVStrong">Very strong</option>
       </select>
     </label>
-    <label>Kontaktschatten:
+    <label><span data-i18n="lblAo">Contact shadows:</span>
       <select id="aoSel">
-        <option value="0" selected>Aus</option>
-        <option value="1">An</option>
+        <option value="0" selected data-i18n="optOff">Off</option>
+        <option value="1" data-i18n="optOn">On</option>
       </select>
     </label>
   </div>
   <div class="toolbar">
-    <span class="lbl">Variation:</span>
-    <button id="varColors">Neue Farben</button>
-    <button id="varCam">Neue Kamera</button>
-    <button id="varSky">Neuer Himmel</button>
-    <button id="varLayout">Neues Layout</button>
+    <span class="lbl" data-i18n="grpVariation">Variation:</span>
+    <button id="varColors" data-i18n="varColors">New colours</button>
+    <button id="varCam" data-i18n="varCam">New camera</button>
+    <button id="varSky" data-i18n="varSky">New sky</button>
+    <button id="varLayout" data-i18n="varLayout">New layout</button>
     <span class="sep"></span>
-    <label>Szene:
+    <label><span data-i18n="lblScene">Scene:</span>
       <select id="archSel">
-        <option value="">Zufall</option>
-        <option value="classic">Klassische Kugeln</option>
-        <option value="mix">Formen-Mix</option>
-        <option value="columns">Säulenhalle</option>
-        <option value="pyramid">Kugelpyramide</option>
-        <option value="floaters">Schwebend</option>
-        <option value="big">Zentralkugel</option>
-        <option value="water">Wasser</option>
-        <option value="room">Innenraum</option>
-        <option value="flake">Sphereflake</option>
-        <option value="helix">Helix</option>
-        <option value="towers">Türme</option>
-        <option value="encased">Glasbox</option>
-        <option value="alien">Fremde Welt</option>
-        <option value="rings">Ringe</option>
-        <option value="logo">Logo-Schriftzug</option>
-        <option value="csg">Würfel &amp; Co (CSG)</option>
-        <option value="menger">Menger-Schwamm</option>
-        <option value="forest">Säulenwald</option>
-        <option value="terrain">Berglandschaft</option>
-        <option value="blobs">Blobs</option>
-        <option value="pool">Schwimmbad</option>
-        <option value="chess">Schachbrett</option>
-        <option value="mirror">Spiegelsaal</option>
-        <option value="juggler">Jongleur</option>
-        <option value="boing">Boing-Ball</option>
-        <option value="billiard">Billard</option>
-        <option value="newton">Newton-Pendel</option>
-        <option value="still">Stillleben</option>
-        <option value="studio">Studio</option>
-        <option value="temple">Tempel</option>
-        <option value="window">Fenster-Licht</option>
-        <option value="stairs">Wendeltreppe</option>
-        <option value="chaos">Chaos</option>
+        <option value="" data-i18n="optRandom">Random</option>
+        <option value="classic" data-i18n="archClassic">Classic spheres</option>
+        <option value="mix" data-i18n="archMix">Shape mix</option>
+        <option value="columns" data-i18n="archColumns">Colonnade</option>
+        <option value="pyramid" data-i18n="archPyramid">Sphere pyramid</option>
+        <option value="floaters" data-i18n="archFloaters">Floating</option>
+        <option value="big" data-i18n="archBig">Central sphere</option>
+        <option value="water" data-i18n="archWater">Water</option>
+        <option value="room" data-i18n="archRoom">Interior</option>
+        <option value="flake" data-i18n="archFlake">Sphereflake</option>
+        <option value="helix" data-i18n="archHelix">Helix</option>
+        <option value="towers" data-i18n="archTowers">Towers</option>
+        <option value="encased" data-i18n="archEncased">Glass box</option>
+        <option value="alien" data-i18n="archAlien">Alien world</option>
+        <option value="rings" data-i18n="archRings">Rings</option>
+        <option value="logo" data-i18n="archLogo">Logo lettering</option>
+        <option value="csg" data-i18n="archCsg">Dice &amp; co (CSG)</option>
+        <option value="menger" data-i18n="archMenger">Menger sponge</option>
+        <option value="forest" data-i18n="archForest">Pillar forest</option>
+        <option value="terrain" data-i18n="archTerrain">Mountain landscape</option>
+        <option value="blobs" data-i18n="archBlobs">Blobs</option>
+        <option value="pool" data-i18n="archPool">Swimming pool</option>
+        <option value="chess" data-i18n="archChess">Chessboard</option>
+        <option value="mirror" data-i18n="archMirror">Hall of mirrors</option>
+        <option value="juggler" data-i18n="archJuggler">The Juggler</option>
+        <option value="boing" data-i18n="archBoing">Boing ball</option>
+        <option value="billiard" data-i18n="archBilliard">Billiards</option>
+        <option value="newton" data-i18n="archNewton">Newton's cradle</option>
+        <option value="still" data-i18n="archStill">Still life</option>
+        <option value="studio" data-i18n="archStudio">Studio</option>
+        <option value="temple" data-i18n="archTemple">Temple</option>
+        <option value="window" data-i18n="archWindow">Window light</option>
+        <option value="stairs" data-i18n="archStairs">Spiral staircase</option>
+        <option value="chaos" data-i18n="archChaos">Chaos</option>
       </select>
     </label>
-    <label>Palette:
+    <label><span data-i18n="lblPalette">Palette:</span>
       <select id="palSel">
-        <option value="">Zufall</option>
-        <option value="primary">Primärfarben</option>
-        <option value="mono">Monochrom</option>
-        <option value="comp">Komplementär</option>
-        <option value="triad">Triade</option>
-        <option value="pastel">Pastell</option>
-        <option value="neon">Neon</option>
-        <option value="gray">Grau + Akzent</option>
+        <option value="" data-i18n="optRandom">Random</option>
+        <option value="primary" data-i18n="palPrimary">Primary colours</option>
+        <option value="mono" data-i18n="palMono">Monochrome</option>
+        <option value="comp" data-i18n="palComp">Complementary</option>
+        <option value="triad" data-i18n="palTriad">Triad</option>
+        <option value="pastel" data-i18n="palPastel">Pastel</option>
+        <option value="neon" data-i18n="palNeon">Neon</option>
+        <option value="gray" data-i18n="palGray">Grey + accent</option>
       </select>
     </label>
     <span class="sep"></span>
-    <label>Galerie: <select id="gallerySel"><option value="">– berühmte Motive –</option></select></label>
+    <label><span data-i18n="lblGallery">Gallery:</span> <select id="gallerySel"><option value="" data-i18n="galleryPlaceholder">– famous motifs –</option></select></label>
     <span class="sep"></span>
-    <button id="btnBatch" title="8 Zufallsbilder als ZIP">Batch-ZIP</button>
+    <button id="btnBatch" data-i18n="btnBatch" data-i18n-title="btnBatchT">Batch ZIP</button>
     <span class="sep"></span>
-    <label>Animation:
+    <label><span data-i18n="lblAnim">Animation:</span>
       <select id="animPath">
-        <option value="orbit">Orbit</option>
-        <option value="spirale">Spirale</option>
-        <option value="wellen">Wellen</option>
-        <option value="sonne">Sonnenumlauf</option>
-        <option value="jonglieren">Jonglieren</option>
-        <option value="pendel">Pendelschwung</option>
-        <option value="huepfen">Boing-Hüpfer</option>
+        <option value="orbit" data-i18n="animOrbit">Orbit</option>
+        <option value="spirale" data-i18n="animSpiral">Spiral</option>
+        <option value="wellen" data-i18n="animWaves">Waves</option>
+        <option value="sonne" data-i18n="animSun">Sun cycle</option>
+        <option value="jonglieren" data-i18n="animJuggle">Juggling</option>
+        <option value="pendel" data-i18n="animPendulum">Pendulum swing</option>
+        <option value="huepfen" data-i18n="animBounce">Boing bounce</option>
       </select>
     </label>
     <select id="animLen">
-      <option value="36">kurz (36 Frames)</option>
-      <option value="72" selected>mittel (72)</option>
-      <option value="120">lang (120)</option>
+      <option value="36" data-i18n="animShort">short (36 frames)</option>
+      <option value="72" selected data-i18n="animMedium">medium (72)</option>
+      <option value="120" data-i18n="animLong">long (120)</option>
     </select>
     <select id="animFmt">
       <option value="gif">GIF</option>
       <option value="webm">WebM</option>
     </select>
-    <button id="btnAnim">Rendern</button>
+    <button id="btnAnim" data-i18n="btnRender">Render</button>
   </div>
   <div class="toolbar">
-    <span class="lbl">Effekte:</span>
-    <label>Himmel:
+    <span class="lbl" data-i18n="grpEffects">Effects:</span>
+    <label><span data-i18n="lblSky">Sky:</span>
       <select id="fxSky">
-        <option value="">Auto</option>
-        <option value="gradient">Tag</option>
-        <option value="clouds">Wolken</option>
-        <option value="sunset">Sonnenuntergang</option>
-        <option value="night">Nacht</option>
-        <option value="bands">Farbbänder</option>
-        <option value="weird">Seltsam</option>
+        <option value="" data-i18n="optAuto">Auto</option>
+        <option value="gradient" data-i18n="skyDay">Day</option>
+        <option value="clouds" data-i18n="skyClouds">Clouds</option>
+        <option value="sunset" data-i18n="skySunset">Sunset</option>
+        <option value="night" data-i18n="skyNight">Night</option>
+        <option value="bands" data-i18n="skyBands">Colour bands</option>
+        <option value="weird" data-i18n="skyWeird">Weird</option>
       </select>
     </label>
-    <label>Nebel: <select id="fxFog" class="tri"></select></label>
-    <label>Berge: <select id="fxMts" class="tri"></select></label>
-    <label>Planeten: <select id="fxPlts" class="tri"></select></label>
-    <label>Gasnebel: <select id="fxNeb" class="tri"></select></label>
-    <label>Flare: <select id="fxFlare" class="tri"></select></label>
-    <label>God-Rays: <select id="fxRays" class="tri"></select></label>
-    <label>Prisma: <select id="fxDisp" class="tri"></select></label>
-    <label>Bloom: <select id="fxBloom" class="tri"></select></label>
-    <label>Fischauge: <select id="fxFish" class="tri"></select></label>
-    <label class="cb"><input type="checkbox" id="fxAna"> Anaglyph 3D</label>
-    <label class="cb"><input type="checkbox" id="fxFrame"> Retro-Rahmen</label>
+    <label><span data-i18n="fxFogL">Fog:</span> <select id="fxFog" class="tri"></select></label>
+    <label><span data-i18n="fxMtsL">Mountains:</span> <select id="fxMts" class="tri"></select></label>
+    <label><span data-i18n="fxPltsL">Planets:</span> <select id="fxPlts" class="tri"></select></label>
+    <label><span data-i18n="fxNebL">Nebula:</span> <select id="fxNeb" class="tri"></select></label>
+    <label><span data-i18n="fxFlareL">Flare:</span> <select id="fxFlare" class="tri"></select></label>
+    <label><span data-i18n="fxRaysL">God rays:</span> <select id="fxRays" class="tri"></select></label>
+    <label><span data-i18n="fxDispL">Prism:</span> <select id="fxDisp" class="tri"></select></label>
+    <label><span data-i18n="fxBloomL">Bloom:</span> <select id="fxBloom" class="tri"></select></label>
+    <label><span data-i18n="fxFishL">Fisheye:</span> <select id="fxFish" class="tri"></select></label>
+    <label class="cb"><input type="checkbox" id="fxAna"> <span data-i18n="chkAna">Anaglyph 3D</span></label>
+    <label class="cb"><input type="checkbox" id="fxFrame"> <span data-i18n="chkFrame">Retro frame</span></label>
   </div>
   <div class="canvasWrap"><div class="canvasInner"><canvas id="cv" width="640" height="480"></canvas></div></div>
   <div class="gallery">
-    <h4>Verlauf</h4>
+    <h4 data-i18n="hHistory">History</h4>
     <div class="strip" id="histStrip"></div>
-    <h4>Favoriten
-      <button id="favExp" class="mini" title="Favoriten als JSON sichern">Export</button>
-      <button id="favImp" class="mini" title="Favoriten aus JSON laden">Import</button>
+    <h4><span data-i18n="hFavourites">Favourites</span>
+      <button id="favExp" class="mini" data-i18n="btnExport" data-i18n-title="btnExportT">Export</button>
+      <button id="favImp" class="mini" data-i18n="btnImport" data-i18n-title="btnImportT">Import</button>
       <input type="file" id="favFile" accept="application/json" style="display:none">
     </h4>
     <div class="strip" id="favStrip"></div>
   </div>
-  <div class="statusbar"><span id="status">Bereit.</span><span id="stats"></span></div>
+  <div class="statusbar"><span id="status" data-i18n="stReady">Ready.</span><span id="stats"></span></div>
 </div>
 
 <script id="coreScript">
@@ -4183,6 +4183,104 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
 <script>
 'use strict';
 (function () {
+  // ---------------- Sprache ----------------
+  // Deutscher Browser → Deutsch, sonst Englisch. Das Markup ist auf Englisch;
+  // bei Deutsch werden alle [data-i18n]-Texte ersetzt.
+  var DE = {
+    docTitle: 'RayTrace ’95 — Zufällige 90er-Raytracing-Bilder',
+    btnNew: 'Neues Bild', btnNewT: 'Leertaste',
+    btnSave: 'PNG speichern',
+    btnFav: '★ Favorit', btnFavT: 'Aktuelles Bild zu den Favoriten',
+    lblSeed: 'Seed:', btnRender: 'Rendern',
+    lblSize: 'Größe:', lblQual: 'Qualität:',
+    qualFast: 'Schnell', qualAdaptive: 'Adaptiv', qualMax: 'Maximal', qualUltra: 'Ultra (weiche Schatten)',
+    chkDither: '256 Farben', chkAuto: 'Auto-Diashow',
+    grpImage: 'Bild:', lblGrade: 'Farbintensität:',
+    gradeOff: 'Aus (roh)', gradeSoft: 'Dezent', gradeNormal: 'Normal', gradeStrong: 'Stark', gradeExtreme: 'Extrem',
+    lblExpo: 'Helligkeit:', expoDark: 'Dunkler', expoNormal: 'Normal', expoBright: 'Heller', expoBright2: 'Sehr hell',
+    lblRefl: 'Spiegelung:', reflNormal: 'Normal', reflWeak: 'Schwach', reflStrong: 'Stark', reflVStrong: 'Sehr stark',
+    lblAo: 'Kontaktschatten:', optOn: 'An', optOff: 'Aus', optAuto: 'Auto', optRandom: 'Zufall',
+    grpVariation: 'Variation:',
+    varColors: 'Neue Farben', varCam: 'Neue Kamera', varSky: 'Neuer Himmel', varLayout: 'Neues Layout',
+    lblScene: 'Szene:',
+    archClassic: 'Klassische Kugeln', archMix: 'Formen-Mix', archColumns: 'Säulenhalle',
+    archPyramid: 'Kugelpyramide', archFloaters: 'Schwebend', archBig: 'Zentralkugel',
+    archWater: 'Wasser', archRoom: 'Innenraum', archFlake: 'Sphereflake', archHelix: 'Helix',
+    archTowers: 'Türme', archEncased: 'Glasbox', archAlien: 'Fremde Welt', archRings: 'Ringe',
+    archLogo: 'Logo-Schriftzug', archCsg: 'Würfel & Co (CSG)', archMenger: 'Menger-Schwamm',
+    archForest: 'Säulenwald', archTerrain: 'Berglandschaft', archBlobs: 'Blobs',
+    archPool: 'Schwimmbad', archChess: 'Schachbrett', archMirror: 'Spiegelsaal',
+    archJuggler: 'Der Jongleur', archBoing: 'Boing-Ball', archBilliard: 'Billard',
+    archNewton: 'Newton-Pendel', archStill: 'Stillleben', archStudio: 'Studio',
+    archTemple: 'Tempel', archWindow: 'Fenster-Licht', archStairs: 'Wendeltreppe', archChaos: 'Chaos',
+    lblPalette: 'Palette:', palPrimary: 'Primärfarben', palMono: 'Monochrom', palComp: 'Komplementär',
+    palTriad: 'Triade', palPastel: 'Pastell', palNeon: 'Neon', palGray: 'Grau + Akzent',
+    lblGallery: 'Galerie:', galleryPlaceholder: '– berühmte Motive –',
+    btnBatch: 'Batch-ZIP', btnBatchT: '8 Zufallsbilder als ZIP',
+    lblAnim: 'Animation:', animOrbit: 'Orbit', animSpiral: 'Spirale', animWaves: 'Wellen',
+    animSun: 'Sonnenumlauf', animJuggle: 'Jonglieren', animPendulum: 'Pendelschwung', animBounce: 'Boing-Hüpfer',
+    animShort: 'kurz (36 Frames)', animMedium: 'mittel (72)', animLong: 'lang (120)',
+    grpEffects: 'Effekte:', lblSky: 'Himmel:',
+    skyDay: 'Tag', skyClouds: 'Wolken', skySunset: 'Sonnenuntergang', skyNight: 'Nacht',
+    skyBands: 'Farbbänder', skyWeird: 'Seltsam',
+    fxFogL: 'Nebel:', fxMtsL: 'Berge:', fxPltsL: 'Planeten:', fxNebL: 'Gasnebel:',
+    fxFlareL: 'Flare:', fxRaysL: 'God-Rays:', fxDispL: 'Prisma:', fxBloomL: 'Bloom:', fxFishL: 'Fischauge:',
+    chkAna: 'Anaglyph 3D', chkFrame: 'Retro-Rahmen',
+    hHistory: 'Verlauf', hFavourites: 'Favoriten',
+    btnExport: 'Export', btnExportT: 'Favoriten als JSON sichern',
+    btnImport: 'Import', btnImportT: 'Favoriten aus JSON laden',
+    stReady: 'Bereit.', stRendering: 'Rendere …', stThreads: 'Threads', stRays: 'Strahlen',
+    stDone: 'Fertig.', stFog: 'Nebel', stRays2: 'God-Rays',
+    stAnaRight: 'Anaglyph: rechtes Auge …', stFavSaved: 'Als Favorit gespeichert.',
+    stBatchImg: 'Batch: Bild', stBatchDone: 'Batch fertig — %n Bilder im ZIP.',
+    stEncGif: 'Kodiere GIF …', stEncWebm: 'Kodiere WebM …',
+    stAnimFrame: 'Frame', stAnimDone: 'Animation fertig — %n Frames, %k kB %f.',
+    stWebmErr: 'WebM-Fehler: ', stNoFavs: 'Keine Favoriten vorhanden.',
+    stFavsImported: '%n Favoriten importiert.', stImportFailed: 'Import fehlgeschlagen: ',
+    galJuggler: 'Der Jongleur', galBoing: 'Boing-Ball', galBilliard: 'Billard',
+    galNewton: 'Newton-Pendel', galStill: 'Stillleben mit Wein', galSaturn: 'Saturn über Schachbrett',
+    galTerrain: 'Berglandschaft', galPool: 'Schwimmbad', galChess: 'Schachbrett am See',
+    galStairs: 'Wendeltreppe', galTemple: 'Tempel', galMirror: 'Spiegelsaal',
+    galMenger: 'Menger-Schwamm', galPyramid: 'Kugelpyramide', galColumns: 'Säulenhalle mit God-Rays'
+  };
+  var EN = {
+    stThreads: 'threads', stRays: 'rays',
+    stRendering: 'Rendering …', stDone: 'Done.', stFog: 'fog', stRays2: 'god rays',
+    stAnaRight: 'Anaglyph: right eye …', stFavSaved: 'Saved to favourites.',
+    stBatchImg: 'Batch: image', stBatchDone: 'Batch done — %n images in the ZIP.',
+    stEncGif: 'Encoding GIF …', stEncWebm: 'Encoding WebM …',
+    stAnimFrame: 'frame', stAnimDone: 'Animation done — %n frames, %k kB %f.',
+    stWebmErr: 'WebM error: ', stNoFavs: 'No favourites yet.',
+    stFavsImported: '%n favourites imported.', stImportFailed: 'Import failed: ',
+    optAuto: 'Auto', optOn: 'On', optOff: 'Off',
+    galJuggler: 'The Juggler', galBoing: 'Boing ball', galBilliard: 'Billiards',
+    galNewton: "Newton's cradle", galStill: 'Still life with wine', galSaturn: 'Saturn over checkerboard',
+    galTerrain: 'Mountain landscape', galPool: 'Swimming pool', galChess: 'Chessboard by the lake',
+    galStairs: 'Spiral staircase', galTemple: 'Temple', galMirror: 'Hall of mirrors',
+    galMenger: 'Menger sponge', galPyramid: 'Sphere pyramid', galColumns: 'Colonnade with god rays'
+  };
+  // Browsersprache entscheidet; ?lang=de / ?lang=en übersteuert das manuell.
+  var langForce = /[?&]lang=(de|en)\b/i.exec(location.search);
+  var isDE = langForce
+    ? langForce[1].toLowerCase() === 'de'
+    : /^de\b/i.test(navigator.language || navigator.userLanguage || 'en');
+  var T = isDE ? DE : EN;
+  function t(key) { return T[key] !== undefined ? T[key] : key; }
+  if (isDE) {
+    document.documentElement.lang = 'de';
+    document.title = DE.docTitle;
+    var nodes = document.querySelectorAll('[data-i18n]');
+    for (var ni = 0; ni < nodes.length; ni++) {
+      var k = nodes[ni].getAttribute('data-i18n');
+      if (DE[k] !== undefined) nodes[ni].textContent = DE[k];
+    }
+    var tnodes = document.querySelectorAll('[data-i18n-title]');
+    for (var ti = 0; ti < tnodes.length; ti++) {
+      var tk = tnodes[ti].getAttribute('data-i18n-title');
+      if (DE[tk] !== undefined) tnodes[ti].title = DE[tk];
+    }
+  }
+
   var cv = document.getElementById('cv');
   var ctx = cv.getContext('2d');
   var statusEl = document.getElementById('status');
@@ -4213,7 +4311,10 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   var triSel = {};
   Object.keys(TRI_KEYS).forEach(function (k) {
     var sel = document.getElementById(TRI_KEYS[k]);
-    sel.innerHTML = '<option value="">Auto</option><option value="1">An</option><option value="0">Aus</option>';
+    sel.innerHTML = '<option value=""></option><option value="1"></option><option value="0"></option>';
+    sel.options[0].textContent = t('optAuto');
+    sel.options[1].textContent = t('optOn');
+    sel.options[2].textContent = t('optOff');
     triSel[k] = sel;
   });
   function fxString() {
@@ -4432,15 +4533,15 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     var scene = RT90.generateScene(parsed.seeds, opts);
     lastScene = scene;
     var t0 = performance.now();
-    statusEl.textContent = 'Rendere …';
+    statusEl.textContent = t('stRendering');
 
     var isCanc = function () { return token !== renderToken; };
     var progressCb = function (img, y0, y1, done, total, rays) {
       if (token !== renderToken) return;
       ctx.putImageData(img, 0, 0, 0, y0, W, y1 - y0);
       var el = (performance.now() - t0) / 1000;
-      statusEl.textContent = 'Rendere … ' + Math.round(done / total * 100) + ' %' + (pool && !pool.failed ? ' (' + pool.workers.length + ' Threads)' : '');
-      statsEl.textContent = el.toFixed(1) + ' s — ' + fmtInt(rays) + ' Strahlen';
+      statusEl.textContent = t('stRendering') + ' ' + Math.round(done / total * 100) + ' %' + (pool && !pool.failed ? ' (' + pool.workers.length + ' ' + t('stThreads') + ')' : '');
+      statsEl.textContent = el.toFixed(1) + ' s — ' + fmtInt(rays) + ' ' + t('stRays');
     };
     var finish = function (result) {
       if (token !== renderToken || !result) return;
@@ -4451,7 +4552,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       lastMaster = result;
       presentImage();
       var el = (performance.now() - t0) / 1000;
-      statusEl.textContent = 'Fertig. (' + scene.info.arch + ' / ' + scene.info.sky + ' / ' + scene.info.pal + (scene.info.fog ? ' / Nebel' : '') + (scene.info.rays ? ' / God-Rays' : '') + ')';
+      statusEl.textContent = t('stDone') + ' (' + scene.info.arch + ' / ' + scene.info.sky + ' / ' + scene.info.pal + (scene.info.fog ? ' / ' + t('stFog') : '') + (scene.info.rays ? ' / ' + t('stRays2') : '') + ')';
       statsEl.textContent = el.toFixed(1) + ' s';
       pushHistory();
       if (autoChk.checked) {
@@ -4471,7 +4572,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       };
       renderImage(parsed.seeds, opts, W, H, mode, eyeCam(-1), null, progressCb, isCanc).then(function (L) {
         if (token !== renderToken || !L) return;
-        statusEl.textContent = 'Anaglyph: rechtes Auge …';
+        statusEl.textContent = t('stAnaRight');
         renderImage(parsed.seeds, opts, W, H, mode, eyeCam(1), null, progressCb, isCanc).then(function (Rr) {
           if (token !== renderToken || !Rr) return;
           RT90.mergeAnaglyph(L.data, Rr.data, W * H * 4);
@@ -4601,33 +4702,33 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     if (list.length > 30) list.length = 30;
     saveList('rt95_favs', list);
     refreshStrips();
-    statusEl.textContent = 'Als Favorit gespeichert.';
+    statusEl.textContent = t('stFavSaved');
   }
 
   // ---------------- Galerie berühmter Motive ----------------
   var GALLERY = [
-    { n: 'Der Jongleur', h: '7;juggler' },
-    { n: 'Boing-Ball', h: '2;boing' },
-    { n: 'Billard', h: '3;billiard' },
-    { n: 'Newton-Pendel', h: '4;newton' },
-    { n: 'Stillleben mit Wein', h: '14;still' },
-    { n: 'Saturn über Schachbrett', h: '70;rings' },
-    { n: 'Berglandschaft', h: '1;terrain' },
-    { n: 'Schwimmbad', h: '3;pool' },
-    { n: 'Schachbrett am See', h: '4;chess' },
-    { n: 'Wendeltreppe', h: '9;stairs' },
-    { n: 'Tempel', h: '7;temple' },
-    { n: 'Spiegelsaal', h: '21;mirror' },
-    { n: 'Menger-Schwamm', h: '1;menger' },
-    { n: 'Kugelpyramide', h: '6;pyramid' },
-    { n: 'Säulenhalle mit God-Rays', h: '12;columns;;rays=1' }
+    { k: 'galJuggler', h: '13;juggler' },
+    { k: 'galBoing', h: '2;boing' },
+    { k: 'galBilliard', h: '3;billiard' },
+    { k: 'galNewton', h: '4;newton' },
+    { k: 'galStill', h: '14;still' },
+    { k: 'galSaturn', h: '70;rings' },
+    { k: 'galTerrain', h: '1;terrain' },
+    { k: 'galPool', h: '3;pool' },
+    { k: 'galChess', h: '4;chess' },
+    { k: 'galStairs', h: '9;stairs' },
+    { k: 'galTemple', h: '7;temple' },
+    { k: 'galMirror', h: '21;mirror' },
+    { k: 'galMenger', h: '1;menger' },
+    { k: 'galPyramid', h: '6;pyramid' },
+    { k: 'galColumns', h: '12;columns;;rays=1' }
   ];
   var gallerySel = document.getElementById('gallerySel');
   function fillGallery() {
     GALLERY.forEach(function (g) {
       var o = document.createElement('option');
       o.value = g.h;
-      o.textContent = g.n;
+      o.textContent = t(g.k);
       gallerySel.appendChild(o);
     });
   }
@@ -4669,14 +4770,14 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
         a.download = 'raytrace95_batch.zip';
         a.click();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-        statusEl.textContent = 'Batch fertig — ' + COUNT + ' Bilder im ZIP.';
+        statusEl.textContent = t('stBatchDone').replace('%n', COUNT);
         busy = false;
         return;
       }
       var master = newMaster();
       var parsed = RT90.parseSeedInput(String(master));
       var scene = RT90.generateScene(parsed.seeds, opts);
-      statusEl.textContent = 'Batch: Bild ' + (idx + 1) + ' / ' + COUNT + ' …';
+      statusEl.textContent = t('stBatchImg') + ' ' + (idx + 1) + ' / ' + COUNT + ' …';
       renderImage(parsed.seeds, opts, W, H, mode, null, null, function (img, y0, y1) {
         if (!isCancelled()) ctx.putImageData(img, 0, 0, 0, y0, W, y1 - y0);
       }, isCancelled).then(function (img) {
@@ -4761,7 +4862,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
           chunk.copyTo(buf);
           webmChunks.push({ data: buf, keyframe: chunk.type === 'key', timeMs: Math.round(chunk.timestamp / 1000) });
         },
-        error: function (e) { statusEl.textContent = 'WebM-Fehler: ' + e.message; }
+        error: function (e) { statusEl.textContent = t('stWebmErr') + e.message; }
       });
       encoder.configure({ codec: 'vp8', width: W, height: H, bitrate: 2500000, framerate: 25 });
     }
@@ -4775,25 +4876,25 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     }
     function finish() {
       if (fmt === 'gif') {
-        statusEl.textContent = 'Kodiere GIF …';
+        statusEl.textContent = t('stEncGif');
         setTimeout(function () {
           var gif = RT90.gifEncode(W, H, frames, 8);
           var blob = new Blob([gif], { type: 'image/gif' });
           downloadBlob(blob, 'raytrace95_' + cleanName() + '_' + path + '.gif');
-          statusEl.textContent = 'Animation fertig — ' + FRAMES + ' Frames, ' + Math.round(blob.size / 1024) + ' kB GIF.';
+          statusEl.textContent = t('stAnimDone').replace('%n', FRAMES).replace('%k', Math.round(blob.size / 1024)).replace('%f', 'GIF');
           busy = false;
         }, 20);
       } else {
-        statusEl.textContent = 'Kodiere WebM …';
+        statusEl.textContent = t('stEncWebm');
         encoder.flush().then(function () {
           var webm = RT90.webmMux(W, H, webmChunks, FRAMES * 40);
           var blob = new Blob([webm], { type: 'video/webm' });
           downloadBlob(blob, 'raytrace95_' + cleanName() + '_' + path + '.webm');
-          statusEl.textContent = 'Animation fertig — ' + FRAMES + ' Frames, ' + Math.round(blob.size / 1024) + ' kB WebM.';
+          statusEl.textContent = t('stAnimDone').replace('%n', FRAMES).replace('%k', Math.round(blob.size / 1024)).replace('%f', 'WebM');
           try { encoder.close(); } catch (e) {}
           busy = false;
         }).catch(function (e) {
-          statusEl.textContent = 'WebM-Fehler: ' + e.message;
+          statusEl.textContent = t('stWebmErr') + e.message;
           busy = false;
         });
       }
@@ -4808,7 +4909,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
                : path === 'jonglieren' ? { type: 'juggle', t: t }
                : path === 'pendel' ? { type: 'newton', t: t }
                : path === 'huepfen' ? { type: 'boing', t: t } : null;
-      statusEl.textContent = 'Animation (' + path + '): Frame ' + (fi + 1) + ' / ' + FRAMES + ' …';
+      statusEl.textContent = 'Animation (' + path + '): ' + t('stAnimFrame') + ' ' + (fi + 1) + ' / ' + FRAMES + ' …';
       renderImage(current.seeds, opts, W, H, mode, cam, anim, null, isCancelled).then(function (img) {
         if (isCancelled() || !img) { abort(); return; }
         if (baseScene.flare) {
@@ -4867,7 +4968,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   var favFile = document.getElementById('favFile');
   document.getElementById('favExp').addEventListener('click', function () {
     var list = loadList('rt95_favs');
-    if (!list.length) { statusEl.textContent = 'Keine Favoriten vorhanden.'; return; }
+    if (!list.length) { statusEl.textContent = t('stNoFavs'); return; }
     downloadBlob(new Blob([JSON.stringify(list, null, 1)], { type: 'application/json' }), 'raytrace95_favoriten.json');
   });
   document.getElementById('favImp').addEventListener('click', function () { favFile.click(); });
@@ -4892,9 +4993,9 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
         if (list.length > 48) list.length = 48;
         saveList('rt95_favs', list);
         refreshStrips();
-        statusEl.textContent = added + ' Favoriten importiert.';
+        statusEl.textContent = t('stFavsImported').replace('%n', added);
       } catch (e) {
-        statusEl.textContent = 'Import fehlgeschlagen: ' + e.message;
+        statusEl.textContent = t('stImportFailed') + e.message;
       }
       favFile.value = '';
     });

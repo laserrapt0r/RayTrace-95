@@ -1,138 +1,142 @@
 # RayTrace ’95
 
-Ein Zufallsbild-Generator im Stil klassischer Raytracing-Bilder der 90er Jahre
-(POV-Ray-Ära): verchromte Kugeln auf Schachbrettböden, Glasobjekte, harte
-Schatten, kitschige Himmel.
+A random image generator in the style of classic 1990s raytracing pictures
+(the POV-Ray era): chrome spheres on checkerboard floors, glass objects, hard
+shadows, kitschy skies.
 
-Alles steckt in **einer einzigen HTML-Datei** ohne jede Abhängigkeit — kein
-Build, kein Server, keine Bibliothek. `index.html` im Browser öffnen, fertig.
-Der Raytracer, der Szenengenerator und sämtliche Encoder (PNG, GIF, ZIP, WebM)
-sind in purem JavaScript von Hand geschrieben.
+Everything lives in **a single HTML file** with zero dependencies — no build
+step, no server, no library. The raytracer, the scene generator and every
+encoder (PNG, GIF, ZIP, WebM) are handwritten in plain JavaScript.
+
+### ▶ [Try it live](https://laserrapt0r.github.io/RayTrace-95/)
 
 | | |
 |---|---|
-| ![Berglandschaft](docs/terrain.png) | ![Saturn im Sonnenuntergang](docs/saturn.png) |
-| ![Der Jongleur](docs/juggler.png) | ![Billard](docs/billiard.png) |
-| ![Schwimmbad](docs/pool.png) | ![Schachbrett](docs/chess.png) |
+| ![Mountain landscape](docs/terrain.png) | ![Saturn at sunset](docs/saturn.png) |
+| ![The Juggler](docs/juggler.png) | ![Billiards](docs/billiard.png) |
+| ![Swimming pool](docs/pool.png) | ![Chessboard](docs/chess.png) |
 
-## Loslegen
+## Getting started
+
+Just open the [live version](https://laserrapt0r.github.io/RayTrace-95/), or
+run it locally:
 
 ```bash
 git clone https://github.com/laserrapt0r/RayTrace-95.git
 cd RayTrace-95
-xdg-open index.html      # oder die Datei einfach doppelklicken
+xdg-open index.html      # or simply double-click the file
 ```
 
-Dann **Neues Bild** klicken (oder Leertaste drücken). Für den schnellen
-Einstieg: das Dropdown **Galerie** enthält eine kuratierte Auswahl berühmter
-Motive.
+Then hit **New image** (or press the spacebar). For a quick tour, the
+**Gallery** dropdown holds a curated selection of famous motifs.
 
-## Bedienung
+The interface is in **English by default and switches to German automatically
+in a German-language browser**. You can force either language with
+`?lang=en` or `?lang=de` in the URL.
 
-- **Neues Bild** (oder Leertaste): würfelt eine komplett neue Szene.
-- **Variation**: würfelt gezielt nur einen Aspekt neu — Farben, Kamera,
-  Himmel oder Layout — und behält den Rest exakt bei.
-- **Seed**: Jedes Bild ist durch seinen Seed (`a.b.c.d`, vier Teilströme für
-  Layout/Palette/Himmel/Kamera) exakt reproduzierbar. Beliebiger Text
-  funktioniert ebenfalls als Master-Seed. Der Seed steht auch in der URL —
-  Link kopieren genügt zum Teilen.
-- **Szene/Palette**: erzwingt einen bestimmten Archetyp bzw. ein Farbschema.
-- **Effekte-Panel**: Himmel, Nebel, Berge, Planeten, Gasnebel, Lens Flare,
-  God-Rays, Prisma-Dispersion, Bloom und Fischauge sind einzeln per
-  Auto/An/Aus wählbar; dazu Anaglyph 3D (Rot/Cyan) und ein Retro-Rahmen mit
-  eingebrannter Bildunterschrift. Alle Einstellungen wandern in den
-  Teilen-Link und in die Favoriten.
-- **Qualität**: Schnell (1 Strahl/Pixel) · Adaptiv (Kantenglättung nur an
-  Kanten) · Maximal (4× überall) · Ultra (zusätzlich weiche Schatten).
-- **Bild-Leiste**: Farbintensität (Aus bis Extrem), Helligkeit,
-  Spiegelungsstärke und Kontaktschatten (Ambient Occlusion). Das Farb-Grading
-  wird **direkt beim Rendern** auf die Float-Farbwerte angewandt (vor der
-  8-Bit-Wandlung, siehe `tone3`) — der knallige CRT-Look entsteht also im
-  Renderer selbst, nicht als nachträglicher Filter, und ohne Banding durch
-  Quantisierung. Der PNG-Export ist dadurch immer exakt das angezeigte Bild.
-- **256 Farben**: Median-Cut-Quantisierung + Floyd-Steinberg-Dithering für
-  den authentischen GIF-Look von damals.
-- **Batch-ZIP**: rendert 8 Zufallsbilder und lädt sie gesammelt als ZIP.
-- **Animation**: Kamerapfade Orbit, Spirale, Wellen (animiertes Wasser),
-  Sonnenumlauf (wandernde Schatten) sowie Objekt-Animationen Jonglieren,
-  Pendelschwung und Boing-Hüpfer — als endlos loopendes GIF oder als
-  WebM-Video (WebCodecs, sofern der Browser es unterstützt). Alle Pfade
-  loopen nahtlos.
-- **Verlauf/Favoriten**: Thumbnails der letzten Bilder (localStorage), Klick
-  lädt das Bild zurück. Favoriten lassen sich als JSON exportieren und in
-  einem anderen Browser wieder importieren.
+## Usage
 
-## Szenen-Archetypen
+- **New image** (or spacebar): rolls a completely new scene.
+- **Variation**: re-rolls just one aspect — colours, camera, sky or layout —
+  and keeps everything else exactly as it is.
+- **Seed**: every image is exactly reproducible from its seed (`a.b.c.d`, four
+  sub-streams for layout/palette/sky/camera). Any text works as a master seed
+  too. The seed also lives in the URL, so copying the link is enough to share
+  an image.
+- **Scene/Palette**: force a specific archetype or colour scheme.
+- **Effects panel**: sky, fog, mountains, planets, nebula, lens flare, god
+  rays, prism dispersion, bloom and fisheye can each be set to Auto/On/Off,
+  plus anaglyph 3D (red/cyan) and a retro frame with a burnt-in caption. Every
+  setting travels in the share link and in your favourites.
+- **Quality**: Fast (1 ray/pixel) · Adaptive (anti-aliasing only along edges) ·
+  Maximum (4× everywhere) · Ultra (adds soft shadows).
+- **Image bar**: colour intensity (Off to Extreme), brightness, reflection
+  strength and contact shadows (ambient occlusion). The colour grading is
+  applied **during rendering** to the floating-point colour values (before the
+  8-bit conversion, see `tone3`) — so the punchy CRT look is produced by the
+  renderer itself rather than by a filter slapped on afterwards, and without
+  banding from quantisation. The PNG export is therefore always exactly what
+  you see on screen.
+- **256 colours**: median-cut quantisation + Floyd–Steinberg dithering for the
+  authentic GIF look of the era.
+- **Batch ZIP**: renders 8 random images and downloads them as one ZIP.
+- **Animation**: camera paths orbit, spiral, waves (animated water) and sun
+  cycle (travelling shadows), plus object animations juggling, pendulum swing
+  and boing bounce — as an endlessly looping GIF or as a WebM video (WebCodecs,
+  where the browser supports it). All paths loop seamlessly.
+- **History/Favourites**: thumbnails of recent images (localStorage); click to
+  bring one back. Favourites can be exported as JSON and imported in another
+  browser.
 
-33 Archetypen sorgen dafür, dass kaum zwei Bilder einander ähneln:
+## Scene archetypes
 
-- **Klassiker**: Kugeln auf Schachbrett, Formen-Mix, Säulenhalle,
-  Kugelpyramide, schwebende Objekte, Zentralkugel, Wasser, Innenraum,
-  Sphereflake, Helix, Türme, Glasbox, Ringe/Tori, Chaos.
-- **Große Würfe**: Berglandschaft (echtes Raymarching-Heightfield mit Schnee,
-  See und schwebender Chromkugel — der Bryce-Look), Blobs/Metaballs,
-  Schwimmbad (transparentes Wasser über gekacheltem Becken mit
-  Kaustik-Lichtnetz), Schachbrett mit Figuren, Spiegelsaal mit
-  Endlos-Reflexionen, Menger-Schwamm, Säulenwald, fremde Welt (Planeten,
-  Monolith, UFO).
-- **Berühmte Motive**: der **Jongleur** (Hommage an Eric Grahams
-  Amiga-Klassiker von 1986, inklusive Jonglier-Animation), der **Boing-Ball**,
-  nummerierte **Billardkugeln** (die Ziffern werden per 5×7-Pixelschrift auf
-  die Kugeloberfläche gerechnet), das **Newton-Pendel** (mit Schwung-Animation),
-  **Stillleben** mit CSG-Weinglas und Trauben, **Studio**-Produktfotos,
-  **Logo-Schriftzüge** aus extrudierten Buchstaben, **Würfel & Co** (CSG:
-  Spielwürfel mit echten Augen-Mulden, angebissene Würfel, Schalen, Rohre).
-- **Kulissen**: griechischer Tempel, Innenraum mit Fenster-Lichtschacht,
-  Wendeltreppe.
+33 archetypes make sure that hardly any two images look alike:
 
-Kombiniert werden sie mit 7 Farbschemata (inklusive reiner
-POV-Ray-Primärfarben), 6 Himmelstypen (Wolken, Sterne, Gasnebel,
-Silhouetten-Berge, Planeten mit Ringen), Nebel, God-Rays, Lens Flare und
-Fake-Kaustiken unter Glasobjekten.
+- **Classics**: spheres on a checkerboard, shape mix, colonnade, sphere
+  pyramid, floating objects, central sphere, water, interior, sphereflake,
+  helix, towers, glass box, rings/tori, chaos.
+- **Big set pieces**: mountain landscape (a real raymarched heightfield with
+  snow, a lake and a floating chrome sphere — the Bryce look), blobs/metaballs,
+  swimming pool (transparent water over a tiled basin with a dancing caustic
+  light net), chessboard with pieces, hall of mirrors with endless reflections,
+  Menger sponge, pillar forest, alien world (planets, monolith, UFO).
+- **Famous motifs**: the **Juggler** (an homage to Eric Graham's 1986 Amiga
+  classic, including a juggling animation), the **Boing ball**, numbered
+  **billiard balls** (the digits are computed onto the sphere surface from a
+  5×7 pixel font), **Newton's cradle** (with a swinging animation), a **still
+  life** with a CSG wine glass and grapes, **studio** product shots, **logo
+  lettering** made of extruded letters, and **dice & co** (CSG: dice with real
+  hollowed-out pips, bitten cubes, bowls, tubes).
+- **Backdrops**: Greek temple, interior with a window light shaft, spiral
+  staircase.
 
-## Technik
+These combine with 7 colour schemes (including pure POV-Ray primaries), 6 sky
+types (clouds, stars, nebulae, silhouetted mountains, ringed planets), fog, god
+rays, lens flare and fake caustics beneath glass objects.
 
-- Rekursiver Raytracer in purem JavaScript: Kugel, Ebene, Box (rotiert),
-  Zylinder, Kegel, **Torus** (Quartic-Löser nach Graphics Gems),
-  **CSG** (Differenz/Schnitt konvexer Körper über Intervall-Arithmetik),
-  **Heightfield-Terrain** (Grid-basiertes Raymarching) und
-  **Blobs/Metaballs** (Feld-Marching mit analytischen Normalen).
-- Spiegelung, Brechung mit Fresnel (Schlick), farbige Glas-Schatten,
-  prozedurale Texturen (Schachbrett, Marmor, Holz, Bozo, Streifen, Grid),
-  Bump-Mapping, Distanz-Fade gegen Moiré.
-- Effekte: volumetrische God-Rays, Prisma-Dispersion (Brechung pro
-  Farbkanal), Bloom/Glow, Anaglyph 3D, Fischaugen-Projektion,
-  Ambient Occlusion und Subsurface-Schimmer bei Marmor.
-- **BVH** (Bounding Volume Hierarchy) für Szenen mit hunderten Objekten.
-- **Web-Worker-Pool** (bis 8 Threads) mit automatischem
-  Hauptthread-Fallback; `?noworker` in der URL erzwingt den Fallback.
-- Eigene Encoder, alles ohne Bibliotheken: PNG (via Canvas), animiertes
-  GIF89a (LZW), ZIP (Store) und WebM (minimaler EBML-Muxer für
-  VP8-Chunks aus WebCodecs).
+## How it works
 
-## Headless-Rendern / Tests
+- Recursive raytracer in plain JavaScript: sphere, plane, box (rotated),
+  cylinder, cone, **torus** (quartic solver after Graphics Gems),
+  **CSG** (difference/intersection of convex solids via interval arithmetic),
+  **heightfield terrain** (grid-based raymarching) and **blobs/metaballs**
+  (field marching with analytic normals).
+- Reflection, refraction with Fresnel (Schlick), coloured glass shadows,
+  procedural textures (checker, marble, wood, bozo, stripes, grid), bump
+  mapping, distance fade to fight moiré.
+- Effects: volumetric god rays, prism dispersion (per-channel refraction),
+  bloom/glow, anaglyph 3D, fisheye projection, ambient occlusion and a
+  subsurface sheen on marble.
+- **BVH** (bounding volume hierarchy) for scenes with hundreds of objects.
+- **Web worker pool** (up to 8 threads) with an automatic main-thread
+  fallback; `?noworker` in the URL forces the fallback.
+- Hand-rolled encoders, no libraries at all: PNG (via canvas), animated GIF89a
+  (LZW), ZIP (store) and WebM (a minimal EBML muxer for VP8 chunks from
+  WebCodecs).
 
-Der Renderkern lässt sich mit Node ohne Browser ausführen — praktisch als
-Batch-Renderer und als Regressionstest:
+## Headless rendering / tests
+
+The render core also runs under Node without a browser — handy as a batch
+renderer and as a regression test:
 
 ```bash
-# Einzelne Bilder rendern (Ausgabeordner, dann Seeds)
+# Render individual images (output directory, then seeds)
 node test/render.js out 42 1234:terrain "7:forest:rays=1,sky=sunset"
 
-# Robustheits-Sweep: 400 Seeds über alle Archetypen, prüft auf Fehler
+# Robustness sweep: 400 seeds across all archetypes, checks for errors
 SWEEP=400 node test/render.js
 ```
 
-Umgebungsvariablen: `W`/`H` (Auflösung), `MODE` (0–3, wie die Qualitätsstufen),
-`DITHER=1` (256 Farben), `BLOOM=1`, `FRAME=1` (Retro-Rahmen),
-`NOGRADE=1` (ohne Farb-Grading), `GIF=1` (zusätzlich ein kleines Orbit-GIF).
+Environment variables: `W`/`H` (resolution), `MODE` (0–3, same as the quality
+levels), `DITHER=1` (256 colours), `BLOOM=1`, `FRAME=1` (retro frame),
+`NOGRADE=1` (no colour grading), `GIF=1` (also writes a small orbit GIF).
 
-## Browser-Unterstützung
+## Browser support
 
-Läuft in jedem modernen Browser. Der WebM-Export setzt WebCodecs voraus
-(Chrome/Edge); ohne WebCodecs wird die Option automatisch deaktiviert, der
-GIF-Export funktioniert überall.
+Runs in any modern browser. The WebM export requires WebCodecs (Chrome/Edge);
+without it the option is disabled automatically and the GIF export works
+everywhere.
 
-## Lizenz
+## Licence
 
 [MIT](LICENSE) — © 2026 Tommy Wurzbacher
