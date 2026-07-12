@@ -29,8 +29,11 @@ Abhängigkeiten — einfach `index.html` im Browser öffnen, kein Server nötig.
 - **256 Farben**: Median-Cut-Quantisierung + Floyd-Steinberg-Dithering für
   den authentischen GIF-Look von damals (ohne Neu-Rendern umschaltbar).
 - **Batch-ZIP**: rendert 8 Zufallsbilder und lädt sie gesammelt als ZIP.
-- **Animation**: Kamerapfade Orbit, Spirale, Wellen (animiertes Wasser) und
-  Sonnenumlauf (wandernde Schatten) — als endlos loopendes GIF oder als
+- **Galerie**: Kuratierte Sammlung berühmter Motive (Jongleur, Boing-Ball,
+  Billard, Newton-Pendel, Saturn, Stillleben, …) — ein Klick lädt das Bild.
+- **Animation**: Kamerapfade Orbit, Spirale, Wellen (animiertes Wasser),
+  Sonnenumlauf (wandernde Schatten) sowie Objekt-Animationen Jonglieren,
+  Pendelschwung und Boing-Hüpfer — als endlos loopendes GIF oder als
   WebM-Video (WebCodecs, sofern der Browser es unterstützt). Alle Pfade
   loopen nahtlos.
 - **Verlauf/Favoriten**: Thumbnails der letzten Bilder (localStorage), Klick
@@ -47,8 +50,14 @@ mit Augen, angebissene Würfel, Schalen, Rohre), Menger-Schwamm und
 Säulenwald, Berglandschaft (echtes Raymarching-Heightfield mit Schnee,
 See und schwebender Chromkugel — der Bryce-Look), Blobs/Metaballs,
 Schwimmbad (transparentes Wasser über gekacheltem Becken mit
-Kaustik-Lichtnetz), Schachbrett mit Figuren und Spiegelsaal mit
-Endlos-Reflexionen — kombiniert mit 7 Farbschemata (inkl. reiner
+Kaustik-Lichtnetz), Schachbrett mit Figuren, Spiegelsaal mit
+Endlos-Reflexionen — und die berühmten Motive: der Jongleur (Hommage an
+Eric Grahams Amiga-Klassiker von 1986, inkl. Jonglier-Animation), der
+Boing-Ball, nummerierte Billardkugeln (Ziffern per 5×7-Pixelschrift als
+Kugeltextur), das Newton-Pendel (mit Schwung-Animation), Stillleben mit
+CSG-Weinglas und Trauben, Studio-Produktfotos, griechischer Tempel,
+Innenraum mit Fenster-Lichtschacht und Wendeltreppe — kombiniert mit
+7 Farbschemata (inkl. reiner
 POV-Ray-Primärfarben), 6 Himmelstypen (inkl. Wolken, Sternen, Gasnebeln,
 Silhouetten-Bergen und Planeten mit Ringen), Nebel, God-Rays, Lens Flare
 und Fake-Kaustiken unter Glasobjekten.

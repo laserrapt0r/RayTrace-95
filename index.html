@@ -165,6 +165,8 @@
         <option value="1024x768">1024 × 768</option>
         <option value="1280x720">1280 × 720</option>
         <option value="1920x1080">1920 × 1080</option>
+        <option value="2560x1440">2560 × 1440</option>
+        <option value="3840x2160">3840 × 2160 (4K)</option>
       </select>
     </label>
     <label>Qualität:
@@ -212,6 +214,15 @@
         <option value="pool">Schwimmbad</option>
         <option value="chess">Schachbrett</option>
         <option value="mirror">Spiegelsaal</option>
+        <option value="juggler">Jongleur</option>
+        <option value="boing">Boing-Ball</option>
+        <option value="billiard">Billard</option>
+        <option value="newton">Newton-Pendel</option>
+        <option value="still">Stillleben</option>
+        <option value="studio">Studio</option>
+        <option value="temple">Tempel</option>
+        <option value="window">Fenster-Licht</option>
+        <option value="stairs">Wendeltreppe</option>
         <option value="chaos">Chaos</option>
       </select>
     </label>
@@ -228,6 +239,8 @@
       </select>
     </label>
     <span class="sep"></span>
+    <label>Galerie: <select id="gallerySel"><option value="">– berühmte Motive –</option></select></label>
+    <span class="sep"></span>
     <button id="btnBatch" title="8 Zufallsbilder als ZIP">Batch-ZIP</button>
     <span class="sep"></span>
     <label>Animation:
@@ -236,6 +249,9 @@
         <option value="spirale">Spirale</option>
         <option value="wellen">Wellen</option>
         <option value="sonne">Sonnenumlauf</option>
+        <option value="jonglieren">Jonglieren</option>
+        <option value="pendel">Pendelschwung</option>
+        <option value="huepfen">Boing-Hüpfer</option>
       </select>
     </label>
     <select id="animLen">
@@ -499,6 +515,27 @@ function texAt(tex, x, z, y, dist) {
       var fz = Math.abs((((z / s) % 1) + 1) % 1 - 0.5);
       c = (fx > 0.5 - tex.lw || fz > 0.5 - tex.lw) ? tex.c2 : tex.c1;
       break;
+    case 'billiard': { // Billardkugel: Farbe/Streifen + Nummernscheibe mit Pixelschrift
+      var bi = 1 / tex.r;
+      var bX = x * bi, bY = y * bi, bZ = z * bi;
+      var bWhite = [0.94, 0.93, 0.88];
+      c = tex.stripe && Math.abs(bY) > 0.55 ? bWhite : tex.c1;
+      var bdp = bX * tex.fx + bY * tex.fy + bZ * tex.fz;
+      if (tex.num && bdp > 0.8) {
+        c = bWhite;
+        var bpu = bX * tex.t1x + bY * tex.t1y + bZ * tex.t1z;
+        var bpv = bX * tex.t2x + bY * tex.t2y + bZ * tex.t2z;
+        var bcell = 0.055;
+        var bcols = tex.num.length * 6 - 1;
+        var bgx = Math.floor((bpu + bcols * bcell / 2) / bcell);
+        var bgy = Math.floor((0.24 - bpv) / bcell);
+        if (bgx >= 0 && bgx < bcols && bgy >= 0 && bgy < 7 && bgx % 6 < 5) {
+          var bgl = FONT_EXTRA[tex.num[(bgx / 6) | 0]];
+          if (bgl && (bgl[bgy] & (16 >> (bgx % 6)))) c = [0.06, 0.05, 0.06];
+        }
+      }
+      break;
+    }
     default: c = tex.c1;
   }
   if (tex.caustic) { // tanzendes Lichtnetz (Poolboden)
@@ -670,6 +707,19 @@ function matBozo(R, pal) {
       freq: R.range(1.5, 4), t1: R.range(0.38, 0.46), t2: R.range(0.5, 0.58), off: R.range(0, 100) },
     diffuse: 0.85, ambK: 1, specular: 0.35, shine: 50,
     reflect: R.range(0.02, 0.14), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+}
+function matBilliard(baseCol, stripe, num, r, ang) {
+  var fx = Math.sin(ang), fy = 0.3, fz = Math.cos(ang);
+  var fl = Math.sqrt(fx * fx + fy * fy + fz * fz);
+  fx /= fl; fy /= fl; fz /= fl;
+  var t1x = fz, t1z = -fx;
+  var tl = Math.sqrt(t1x * t1x + t1z * t1z) + 1e-9;
+  t1x /= tl; t1z /= tl;
+  var t2x = fy * t1z, t2y = fz * t1x - fx * t1z, t2z = -fy * t1x;
+  return { tex: { type: 'billiard', c1: baseCol, stripe: stripe, num: num, r: r,
+      fx: fx, fy: fy, fz: fz, t1x: t1x, t1y: 0, t1z: t1z, t2x: t2x, t2y: t2y, t2z: t2z },
+    diffuse: 0.75, ambK: 1, specular: 1, shine: 250,
+    reflect: 0.13, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
 }
 function matCheckerObj(R, pal) {
   var c1 = pal.obj(), c2 = R.chance(0.5) ? [0.95, 0.95, 0.95] : scale3(pal.obj(), 0.5);
@@ -1157,8 +1207,9 @@ var DICE_FACES = [ // [Normale, u, v, Augenzahl]
   [[0, 0, 1], [1, 0, 0], [0, 1, 0], 2],
   [[0, 0, -1], [1, 0, 0], [0, 1, 0], 5]
 ];
-function mkDice(x, z, s, rot, mat) {
-  var box = mkBox(x, s, z, s, s, s, rot, mat);
+function mkDice(x, z, s, rot, mat, y0) {
+  y0 = y0 || 0;
+  var box = mkBox(x, y0 + s, z, s, s, s, rot, mat);
   var pips = [];
   var pr = s * 0.17, off = s * 0.5;
   var c = Math.cos(rot), sn = Math.sin(rot);
@@ -1169,7 +1220,7 @@ function mkDice(x, z, s, rot, mat) {
       var lx = F[0][0] * s + F[1][0] * lay[p][0] * off + F[2][0] * lay[p][1] * off;
       var ly = F[0][1] * s + F[1][1] * lay[p][0] * off + F[2][1] * lay[p][1] * off;
       var lz = F[0][2] * s + F[1][2] * lay[p][0] * off + F[2][2] * lay[p][1] * off;
-      pips.push(mkSphere(x + c * lx + sn * lz, s + ly, z - sn * lx + c * lz, pr, mat));
+      pips.push(mkSphere(x + c * lx + sn * lz, y0 + s + ly, z - sn * lx + c * lz, pr, mat));
     }
   }
   return mkCsg('sub', box, pips, mat);
@@ -1635,7 +1686,9 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
       var cdx = px - C.x, cdz = pz - C.z;
       var cd2 = (cdx * cdx + cdz * cdz) / (C.r * C.r);
       if (cd2 < 5) {
-        var cg2 = Math.exp(-cd2 * 1.3) * C.k;
+        // Ringprofil: heller Saum um ein schwächeres Zentrum (wie echte Kaustik)
+        var cdn = Math.sqrt(cd2);
+        var cg2 = (Math.exp(-cd2 * 2.2) * 0.45 + Math.exp(-(cdn - 1.15) * (cdn - 1.15) * 6)) * C.k * 0.8;
         cr += base[0] * C.col[0] * cg2;
         cg += base[1] * C.col[1] * cg2;
         cb += base[2] * C.col[2] * cg2;
@@ -1863,10 +1916,10 @@ function makeSky(R, pal, hint) {
 }
 
 function makeFloorMat(Rl, Rp, pal, sky, hint) {
-  var kind = wpick(Rl, [['bw', 2.6], ['colChecker', 3], ['marble', 1.1], ['solid', 1.2],
+  var kind = wpick(Rl, [['bw', 2], ['colChecker', 3.6], ['marble', 1.1], ['solid', 1.2],
                         ['grid', (sky.stars || pal.scheme === 'neon') ? 2 : 0.4], ['stripes', 0.8],
                         ['wood', hint === 'room' ? 2.5 : 0.6], ['bozo', hint === 'alien' ? 3 : 0.3]]);
-  var tex, reflect = Math.pow(Rl.next(), 1.6) * 0.45;
+  var tex, reflect = 0.15 + Math.pow(Rl.next(), 1.2) * 0.5;
   var sc = Rl.range(0.8, 2.2);
   switch (kind) {
     case 'bw': {
@@ -1875,20 +1928,23 @@ function makeFloorMat(Rl, Rp, pal, sky, hint) {
       break;
     }
     case 'colChecker': {
-      var ca = hsl(Rp.pick(pal.hues), Rp.range(0.6, 0.95), Rp.range(0.35, 0.5));
-      var cb2 = Rp.chance(0.5) ? [0.92, 0.9, 0.86] : hsl(Rp.pick(pal.hues) + Rp.range(-0.08, 0.08), Rp.range(0.5, 0.9), Rp.range(0.12, 0.25));
+      var ca = hsl(Rp.pick(pal.hues), Rp.range(0.7, 1), Rp.range(0.38, 0.52));
+      var cbKind = wpick(Rp, [['white', 1.6], ['color', 1.6], ['black', 0.8]]);
+      var cb2 = cbKind === 'white' ? [0.93, 0.91, 0.87]
+              : cbKind === 'black' ? [0.05, 0.05, 0.07]
+              : hsl(Rp.pick(pal.hues) + Rp.range(-0.06, 0.06), Rp.range(0.7, 1), Rp.range(0.3, 0.5));
       tex = { type: 'checker', c1: ca, c2: cb2, scale: sc };
       break;
     }
     case 'marble': {
       tex = { type: 'marble', c1: [0.85, 0.84, 0.8], c2: Rp.chance(0.5) ? [0.2, 0.2, 0.25] : scale3(pal.obj(), 0.45),
         ax: 1, az: Rp.range(-0.6, 0.6), freq: Rp.range(0.5, 1.2), turb: Rp.range(3, 8), off: Rp.range(0, 100) };
-      reflect = Rl.range(0.1, 0.4);
+      reflect = Rl.range(0.2, 0.5);
       break;
     }
     case 'grid': {
       tex = { type: 'grid', c1: [0.02, 0.02, 0.05], c2: hsl(Rp.pick(pal.hues), 1, 0.6), scale: Rl.range(1, 2), lw: 0.03 };
-      reflect = Rl.range(0.15, 0.45);
+      reflect = Rl.range(0.25, 0.55);
       break;
     }
     case 'stripes': {
@@ -1900,7 +1956,7 @@ function makeFloorMat(Rl, Rp, pal, sky, hint) {
       var w1 = hsl(Rp.range(0.06, 0.1), Rp.range(0.4, 0.6), Rp.range(0.4, 0.55));
       tex = { type: 'wood', c1: w1, c2: scale3(w1, 0.5), ax: 1, az: Rp.range(-0.15, 0.15),
         freq: Rp.range(3, 7), turb: Rp.range(1.5, 3.5), off: Rp.range(0, 100) };
-      reflect = Rl.range(0.05, 0.25);
+      reflect = Rl.range(0.12, 0.35);
       break;
     }
     case 'bozo': {
@@ -1910,7 +1966,7 @@ function makeFloorMat(Rl, Rp, pal, sky, hint) {
     }
     default:
       tex = { type: 'solid', c1: scale3(pal.obj(), 0.8) };
-      reflect = Rl.range(0.15, 0.5);
+      reflect = Rl.range(0.25, 0.6);
   }
   if (tex.type !== 'solid') {
     tex.fade = Rl.range(25, 60);
@@ -2046,7 +2102,9 @@ var ARCH_WEIGHTS = [['classic', 3], ['mix', 2.5], ['columns', 1.5], ['pyramid', 
                     ['flake', 1], ['chaos', 1.2], ['helix', 1], ['towers', 1.2],
                     ['encased', 1], ['alien', 1.3], ['rings', 1.4],
                     ['logo', 1.4], ['csg', 1.3], ['menger', 0.9], ['forest', 1],
-                    ['terrain', 1.3], ['blobs', 1.2], ['pool', 1.3], ['chess', 1.5], ['mirror', 1]];
+                    ['terrain', 1.3], ['blobs', 1.2], ['pool', 1.3], ['chess', 1.5], ['mirror', 1],
+                    ['juggler', 1.2], ['boing', 0.9], ['billiard', 1.3], ['newton', 1],
+                    ['still', 1.2], ['studio', 1.1], ['temple', 1.2], ['window', 1.1], ['stairs', 1]];
 
 // 5×7-Pixelschrift (MSB = linke Spalte)
 var FONT57 = {
@@ -2073,7 +2131,8 @@ function generateScene(seeds, opts) {
   if (opts.arch) arch = opts.arch;
 
   var sky = makeSky(Rs, pal, { sunset: arch === 'water' || arch === 'terrain', alien: arch === 'alien',
-    sunny: arch === 'pool', forceType: opts.sky || null, mts: opts.mts, plts: opts.plts, neb: opts.neb });
+    sunny: arch === 'pool' || arch === 'window', forceType: opts.sky || null,
+    mts: opts.mts, plts: opts.plts, neb: opts.neb });
   var night = !!sky.stars;
 
   var scene = { objects: [], lights: [], sky: sky, fog: null, flare: null, info: {} };
@@ -2087,6 +2146,7 @@ function generateScene(seeds, opts) {
   var aisle = null; // Kamera-Hinweis der Säulenhalle
   var camHint = null; // bevorzugter Kamerawinkel (z. B. Logo frontal)
   var customCam = null; // komplett eigene Kamera (Terrain, Pool, Spiegelsaal)
+  var windowLight = null; // Hauptlicht vor dem Fenster (Lichtschacht)
   var roomD = 0;
   var placed = [];
   var maxH = 2, boundR = 6;
@@ -2437,6 +2497,352 @@ function generateScene(seeds, opts) {
       }
       break;
     }
+    case 'juggler': { // Hommage an Eric Grahams „Juggler“ (Amiga 1986)
+      var jS = Rl.range(0.9, 1.15);
+      var jMat = Rl.chance(0.4) ? matChrome(Rp) : matGlossy(Rp, pal);
+      var jBallM = matChrome(Rp);
+      var J = function (x, y, z, r) { scene.objects.push(mkSphere(x * jS, y * jS, z * jS, r * jS, jMat)); };
+      J(0, 3.05, 0, 0.3); J(0, 2.62, 0, 0.2); // Kopf, Hals
+      J(0, 2.3, 0, 0.42); J(0, 1.85, 0, 0.46); J(0, 1.42, 0, 0.42); // Torso
+      for (var jsd = -1; jsd <= 1; jsd += 2) {
+        J(jsd * 0.52, 2.5, 0, 0.18); // Schulter
+        for (k = 1; k <= 3; k++) { // Oberarm
+          J(jsd * (0.52 + 0.23 * k / 3), 2.5 - 0.45 * k / 3, 0.12 * k / 3, 0.13);
+        }
+        for (k = 1; k <= 3; k++) { // Unterarm (nach oben)
+          J(jsd * (0.75 - 0.15 * k / 3), 2.05 + 0.6 * k / 3, 0.12 + 0.3 * k / 3, 0.13);
+        }
+        J(jsd * 0.6, 2.72, 0.45, 0.16); // Hand
+        J(jsd * 0.26, 1.12, 0, 0.2); // Hüfte
+        for (k = 1; k <= 4; k++) { // Bein
+          J(jsd * (0.26 + 0.06 * k / 4), 1.12 - 0.95 * k / 4, 0.03 * k / 4, 0.13);
+        }
+        J(jsd * 0.34, 0.14, 0.18, 0.16); // Fuß
+      }
+      var jb = [];
+      for (i = 0; i < 3; i++) {
+        var jbS = mkSphere(0, 3 * jS, 0.45 * jS, 0.22 * jS, jBallM);
+        scene.objects.push(jbS);
+        jb.push(jbS);
+      }
+      scene.jug = { balls: jb, s: jS, hx: 0.6 * jS, hy: 2.72 * jS, hz: 0.45 * jS, peak: 4.15 * jS };
+      placed.push({ x: 0, z: 0, r: 2 });
+      camHint = { ang: Rl.range(-0.4, 0.4), spread: 0.35 };
+      maxH = 4.3 * jS;
+      boundR = 2.2;
+      break;
+    }
+    case 'boing': { // Amiga-Boing-Ball
+      var boR = Rl.range(1.1, 1.6);
+      var boMat = { tex: { type: 'checker', c1: [0.92, 0.9, 0.88], c2: [0.85, 0.06, 0.05],
+          scale: boR * Rl.range(0.42, 0.55), d3: true },
+        diffuse: 0.85, ambK: 1, specular: 0.5, shine: 60,
+        reflect: Rl.range(0.02, 0.1), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      var boBall = mkSphere(0, boR * 2, 0, boR, boMat);
+      scene.objects.push(boBall);
+      scene.boing = { ball: boBall, r: boR, h: Rl.range(1.6, 2.4) };
+      var gridC = Rp.chance(0.7) ? [0.55, 0.35, 0.85] : hsl(Rp.pick(pal.hues), 0.7, 0.6);
+      var boGrid = function (fade) {
+        return { tex: { type: 'grid', c1: [0.72, 0.72, 0.74], c2: gridC, scale: Rl.range(0.9, 1.3), lw: 0.035,
+            fade: fade ? 40 : 0, avg: [0.7, 0.7, 0.72] },
+          diffuse: 0.9, ambK: 1, specular: 0.1, shine: 20,
+          reflect: fade ? Rl.range(0.05, 0.2) : 0, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      };
+      floorMat = boGrid(true);
+      scene.objects.push(mkPlane(0, 0, -Rl.range(5, 8), 0, 0, 1, boGrid(false))); // Grid-Rückwand
+      placed.push({ x: 0, z: 0, r: 3 });
+      camHint = { ang: Rl.range(-0.3, 0.3), spread: 0.3 };
+      maxH = boR * 2 + 2.5;
+      boundR = 3.2;
+      break;
+    }
+    case 'billiard': { // Billardkugeln im Dreieck
+      var bilR = 0.36;
+      floorMat = { tex: { type: 'solid', c1: [Rp.range(0.02, 0.06), Rp.range(0.28, 0.42), Rp.range(0.08, 0.16)] },
+        diffuse: 0.95, ambK: 1, specular: 0.05, shine: 10,
+        reflect: 0, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      var rackAng = Rl.range(-0.35, 0.35);
+      var BALL_HUES = { 1: [0.95, 0.8, 0.1], 2: [0.12, 0.25, 0.8], 3: [0.85, 0.1, 0.08], 4: [0.4, 0.12, 0.5],
+        5: [0.9, 0.45, 0.08], 6: [0.08, 0.4, 0.18], 7: [0.5, 0.12, 0.1] };
+      var ORDER = [1, 9, 2, 10, 8, 3, 11, 7, 14, 4, 5, 13, 15, 6, 12];
+      var bIdx = 0;
+      var bca = Math.cos(rackAng), bsa = Math.sin(rackAng);
+      for (var brow = 0; brow < 5; brow++) {
+        for (var bcol = 0; bcol <= brow; bcol++) {
+          var bnum = ORDER[bIdx++];
+          var blx = (bcol - brow / 2) * bilR * 2.02;
+          var blz = -brow * bilR * 1.78;
+          var baseC = bnum === 8 ? [0.05, 0.05, 0.06] : BALL_HUES[bnum > 8 ? bnum - 8 : bnum];
+          scene.objects.push(mkSphere(bca * blx + bsa * blz, bilR, -bsa * blx + bca * blz, bilR,
+            matBilliard(baseC, bnum > 8, String(bnum), bilR, rackAng)));
+        }
+      }
+      var cbx = Rl.range(-0.8, 0.8), cbz = Rl.range(1.7, 2.5);
+      var cwx = bca * cbx + bsa * cbz, cwz = -bsa * cbx + bca * cbz;
+      scene.objects.push(mkSphere(cwx, bilR, cwz, bilR, matBilliard([0.93, 0.92, 0.88], false, '', bilR, rackAng)));
+      if (Rl.chance(0.6)) { // Queue
+        scene.objects.push(mkBox(cwx + 1.7, 0.055, cwz + 1.3, 1.7, 0.05, 0.05, rackAng + Rl.range(0.4, 1), matWood(Rp, pal)));
+      }
+      placed.push({ x: 0, z: 0, r: 5 });
+      var bAng2 = rackAng + Rc.range(-0.35, 0.35);
+      var bD2 = Rc.range(4.2, 6);
+      customCam = { ex: Math.sin(bAng2) * bD2, ey: Rc.range(1.5, 2.8), ez: Math.cos(bAng2) * bD2,
+        lx: bsa * -1.2, ly: 0.15, lz: bca * -1.2, fov: Rc.range(46, 58) };
+      maxH = 1;
+      boundR = 4.5;
+      break;
+    }
+    case 'newton': { // Newton-Pendel
+      var nR = 0.32, nN = 5;
+      var nL = Rl.range(1.3, 1.7);
+      var nBallY = 0.6, nPivotY = nBallY + nL;
+      var nBarZ = 0.55;
+      var nW = (nN - 1) * nR * 2.02 / 2 + 0.6;
+      var nFrame = Rl.chance(0.5) ? matChrome(Rp) : matMetalTint(Rp);
+      var nPlinth = Rl.chance(0.5) ? matWood(Rp, pal) : matMarbleTex(Rp, pal);
+      scene.objects.push(mkBox(0, 0.09, 0, nW + 0.4, 0.09, nBarZ + 0.55, 0, nPlinth));
+      for (var nlx = -1; nlx <= 1; nlx += 2) {
+        for (var nlz = -1; nlz <= 1; nlz += 2) {
+          scene.objects.push(mkCyl(nlx * nW, nlz * nBarZ, 0.18, nPivotY + 0.05, 0.06, nFrame));
+        }
+      }
+      scene.objects.push(mkBox(0, nPivotY + 0.03, nBarZ, nW + 0.05, 0.035, 0.035, 0, nFrame));
+      scene.objects.push(mkBox(0, nPivotY + 0.03, -nBarZ, nW + 0.05, 0.035, 0.035, 0, nFrame));
+      var nBalls = [], nChains = [], nX0 = [];
+      var nStr = { tex: { type: 'solid', c1: [0.75, 0.75, 0.78] }, diffuse: 0.6, ambK: 1, specular: 0.4,
+        shine: 60, reflect: 0, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      var nChrome = matChrome(Rp);
+      for (i = 0; i < nN; i++) {
+        var nx0 = (i - (nN - 1) / 2) * nR * 2.02;
+        nX0.push(nx0);
+        var nb2 = mkSphere(nx0, nBallY, 0, nR, nChrome);
+        scene.objects.push(nb2);
+        nBalls.push(nb2);
+        var sides = [];
+        for (var nsd = 0; nsd < 2; nsd++) {
+          var chain = [];
+          for (k = 0; k < 5; k++) {
+            var cs2 = mkSphere(nx0, nPivotY, 0, 0.016, nStr);
+            scene.objects.push(cs2);
+            chain.push(cs2);
+          }
+          sides.push(chain);
+        }
+        nChains.push(sides);
+      }
+      scene.newton = { balls: nBalls, chains: nChains, x0s: nX0, L: nL,
+        pivotY: nPivotY, barZ: nBarZ, amp: Rl.range(0.45, 0.7) };
+      placed.push({ x: 0, z: 0, r: nW + 1.5 });
+      camHint = { ang: Rl.range(-0.45, 0.45), spread: 0.3 };
+      maxH = nPivotY + 0.4;
+      boundR = nW + 1.2;
+      break;
+    }
+    case 'still': { // Stillleben: Weinglas, Trauben, Orange
+      var addGoblet = function (gx, gz, gs, withWine) {
+        var gm2 = matGlass(Rp, pal);
+        scene.objects.push(mkCyl(gx, gz, 0, 0.06 * gs, 0.4 * gs, gm2));
+        scene.objects.push(mkCyl(gx, gz, 0.06 * gs, 0.72 * gs, 0.06 * gs, gm2));
+        var bc = 1.08 * gs, br2 = 0.48 * gs;
+        scene.objects.push(mkCsg('sub',
+          mkSphere(gx, bc, gz, br2, gm2),
+          [mkSphere(gx, bc + 0.03 * gs, gz, br2 - 0.05 * gs, gm2),
+           mkBox(gx, bc + 0.12 * gs + 0.6 * gs, gz, br2 + 0.1, 0.6 * gs, br2 + 0.1, 0, gm2)],
+          gm2));
+        if (withWine) {
+          var wineM = { tex: { type: 'solid', c1: [0.2, 0.01, 0.03] }, diffuse: 0.2, ambK: 0.5,
+            specular: 0.8, shine: 150, reflect: 0,
+            reflTint: [1, 1, 1], transparency: 0.55, ior: 1.35, tint: [0.75, 0.1, 0.15] };
+          scene.objects.push(mkCsg('sub', mkSphere(gx, bc, gz, br2 - 0.07 * gs, wineM),
+            [mkBox(gx, bc + 0.02 * gs + 0.5 * gs, gz, br2, 0.5 * gs, br2, 0, wineM)], wineM));
+        }
+        placed.push({ x: gx, z: gz, r: br2 + 0.2 });
+      };
+      spot = placeOnFloor(Rl, placed, 0.65, 0.75, 1.5);
+      if (spot) addGoblet(spot.x, spot.z, Rl.range(0.95, 1.3), Rl.chance(0.65));
+      if (Rl.chance(0.5)) {
+        spot = placeOnFloor(Rl, placed, 0.6, 0.7, 2);
+        if (spot) addGoblet(spot.x, spot.z, Rl.range(0.8, 1.05), Rl.chance(0.5));
+      }
+      if (Rl.chance(0.7)) { // Trauben
+        spot = placeOnFloor(Rl, placed, 0.5, 0.65, 1.9);
+        if (spot) {
+          var grM = { tex: { type: 'solid', c1: hsl(Rp.range(0.75, 0.85), 0.45, 0.32) }, diffuse: 0.8, ambK: 1,
+            specular: 0.7, shine: 90, reflect: 0.05, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+          var gN2 = Rl.int(9, 14);
+          for (k = 0; k < gN2; k++) {
+            var ga2 = Rl.next() * Math.PI * 2, gd2 = Math.sqrt(Rl.next()) * 0.32;
+            scene.objects.push(mkSphere(spot.x + Math.cos(ga2) * gd2,
+              0.11 + Rl.next() * 0.24 * (1 - gd2 * 1.8), spot.z + Math.sin(ga2) * gd2, 0.11, grM));
+          }
+        }
+      }
+      if (Rl.chance(0.45)) { // Orange
+        spot = placeOnFloor(Rl, placed, 0.28, 0.38, 2.2);
+        if (spot) {
+          var orM = { tex: { type: 'solid', c1: hsl(0.07, 0.85, 0.55) }, diffuse: 0.85, ambK: 1,
+            specular: 0.6, shine: 40, reflect: 0.03, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1],
+            bump: { amp: 0.22, freq: 11 } };
+          scene.objects.push(mkSphere(spot.x, spot.r, spot.z, spot.r, orM));
+        }
+      }
+      if (Rl.chance(0.35)) { // Würfel dazu
+        spot = placeOnFloor(Rl, placed, 0.35, 0.45, 2.2);
+        if (spot) scene.objects.push(mkDice(spot.x, spot.z, spot.r, Rl.next() * Math.PI, randMaterial(Rl, Rp, pal)));
+      }
+      maxH = 1.9;
+      boundR = 2.1;
+      break;
+    }
+    case 'studio': { // Produktfoto: Podest, Verlaufs-Backdrop, Farblichter
+      var ph2 = Rl.range(1, 1.6), pr2 = Rl.range(0.85, 1.2);
+      var pedM = Rl.chance(0.5) ? matMarbleTex(Rp, pal)
+        : { tex: { type: 'solid', c1: scale3(pal.obj(), 0.7) }, diffuse: 0.8, ambK: 1, specular: 0.5,
+            shine: 80, reflect: 0.2, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      scene.objects.push(mkCyl(0, 0, 0, ph2, pr2, pedM));
+      var hk = wpick(Rl, [['torus', 2], ['sphere', 2], ['dice', 1.5], ['lens', 1], ['letter', 1.5]]);
+      var hm = wpick(Rl, [['chrome', 3], ['glass', 2], ['gold', 2], ['glossy', 1.5]]);
+      var heroM = hm === 'chrome' ? matChrome(Rp) : hm === 'glass' ? matGlass(Rp, pal)
+                : hm === 'gold' ? matMetalTint(Rp) : matGlossy(Rp, pal);
+      if (hk === 'torus') scene.objects.push(mkTorus(0, ph2 + 0.8, 0, 0.6, 0.22, Rl.next() * Math.PI, Math.PI / 2 * Rl.range(0.75, 1), heroM));
+      else if (hk === 'sphere') scene.objects.push(mkSphere(0, ph2 + 0.75, 0, 0.75, heroM));
+      else if (hk === 'dice') scene.objects.push(mkDice(0, 0, 0.55, Rl.next() * Math.PI, heroM, ph2));
+      else if (hk === 'lens') scene.objects.push(mkLens(0, ph2 + 0.55, 0, 0.85, 1.25, heroM));
+      else { // 3D-Buchstabe
+        var hch = LOGO_WORDS[Rl.int(0, LOGO_WORDS.length - 1)][0];
+        var hgl = FONT57[hch];
+        var hc = 0.17, hth = hc * Rl.range(1.3, 2);
+        for (var hr = 0; hr < 7; hr++) {
+          for (var hcc = 0; hcc < 5; hcc++) {
+            if (hgl[hr] & (16 >> hcc)) {
+              scene.objects.push(mkBox((hcc - 2) * hc, ph2 + (6.5 - hr) * hc, 0,
+                hc * 0.495, hc * 0.495, hth / 2, 0, heroM));
+            }
+          }
+        }
+      }
+      if (!opts.sky) { // nahtloser Studio-Verlauf
+        var sh2 = pal.h0 + Rl.range(-0.05, 0.05);
+        sky.type = 'gradient';
+        sky.zen = hsl(sh2, 0.55, 0.13);
+        sky.hor = hsl(sh2, 0.55, 0.5);
+        sky.clouds = false; sky.stars = false; sky.sun = null;
+        if (opts.plts !== 1) sky.planets = null;
+        if (opts.mts !== 1) sky.mountains = null;
+        if (opts.neb !== 1) sky.nebula = null;
+      }
+      floorMat = { tex: { type: 'solid', c1: hsl(pal.h0, 0.4, 0.16) }, diffuse: 0.8, ambK: 1,
+        specular: 0.4, shine: 60, reflect: Rl.range(0.3, 0.55), reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      scene.lights.push({ x: -6, y: 4, z: 5, col: hsl(pal.h0 + 0.45, 0.85, 0.6), rad: 1.2, intensity: Rl.range(0.4, 0.7) });
+      scene.lights.push({ x: 6, y: 3, z: 4, col: hsl(pal.h0 + 0.1, 0.75, 0.65), rad: 1.2, intensity: Rl.range(0.35, 0.6) });
+      placed.push({ x: 0, z: 0, r: 3 });
+      camHint = { ang: Rl.range(-0.6, 0.6), spread: 0.4 };
+      maxH = ph2 + 1.9;
+      boundR = 2.2;
+      break;
+    }
+    case 'temple': { // griechischer Tempel
+      var tmM = matMarbleTex(Rp, pal);
+      var tmM2 = Rl.chance(0.4) ? matMarbleTex(Rp, pal) : tmM;
+      var tSteps = Rl.int(2, 3);
+      var tpw = Rl.range(5, 6.5), tpd = Rl.range(3.6, 4.6);
+      var tsh = 0.24;
+      for (i = 0; i < tSteps; i++) {
+        scene.objects.push(mkBox(0, tsh * (i + 0.5), 0, tpw + (tSteps - i) * 0.55, tsh / 2, tpd + (tSteps - i) * 0.55, 0, tmM2));
+      }
+      var tTop = tsh * tSteps;
+      var tColH = Rl.range(2.7, 3.6), tColR = Rl.range(0.22, 0.3);
+      var tNc = Rl.int(4, 6);
+      var tSp = (tpw * 2 - 1.4) / (tNc - 1);
+      for (var trw = 0; trw < 2; trw++) {
+        var tz = (trw === 0 ? 1 : -1) * (tpd - 0.7);
+        for (i = 0; i < tNc; i++) {
+          var tx = -tpw + 0.7 + i * tSp;
+          scene.objects.push(mkBox(tx, tTop + 0.045, tz, 0.36, 0.045, 0.36, 0, tmM));
+          scene.objects.push(mkCyl(tx, tz, tTop + 0.09, tTop + 0.09 + tColH, tColR, tmM));
+          scene.objects.push(mkTorus(tx, tTop + 0.09 + tColH, tz, tColR + 0.03, 0.05, 0, 0, tmM));
+          scene.objects.push(mkBox(tx, tTop + 0.19 + tColH, tz, 0.34, 0.06, 0.34, 0, tmM));
+        }
+        scene.objects.push(mkBox(0, tTop + tColH + 0.36, tz, tpw, 0.12, 0.45, 0, tmM2));
+      }
+      scene.objects.push(mkBox(0, tTop + tColH + 0.58, 0, tpw + 0.3, 0.1, tpd + 0.3, 0, tmM2));
+      if (Rl.chance(0.6)) scene.objects.push(mkBox(0, tTop + tColH + 0.78, 0, tpw * 0.72, 0.1, tpd * 0.72, 0, tmM2));
+      if (Rl.chance(0.6)) { // Kugel im Inneren
+        var tStR = Rl.range(0.55, 0.85);
+        scene.objects.push(mkSphere(Rl.range(-1, 1), tTop + tStR, Rl.range(-0.8, 0.8), tStR,
+          Rl.chance(0.5) ? matChrome(Rp) : matGlass(Rp, pal)));
+      }
+      placed.push({ x: 0, z: 0, r: tpw + 2 });
+      camHint = { ang: Rl.range(-0.5, 0.5), spread: 0.45 };
+      maxH = tTop + tColH + 1;
+      boundR = tpw + 1.5;
+      break;
+    }
+    case 'window': { // Innenraum mit Fenster und Lichtschacht
+      var wD2 = Rl.range(6, 9);
+      var winW = Rl.range(1.2, 1.9), winH = Rl.range(1, 1.5);
+      var winY = Rl.range(1.7, 2.3), winX = Rl.range(-1.5, 1.5);
+      var wallH2 = Rl.range(4, 5.5), wHalf = 14, wth = 0.12;
+      var wallC2 = mix3(pal.obj(), [1, 1, 1], Rp.range(0.25, 0.5));
+      var wWallM = { tex: { type: 'solid', c1: wallC2 }, diffuse: 0.9, ambK: 1, specular: 0.1,
+        shine: 20, reflect: 0, reflTint: [1, 1, 1], transparency: 0, ior: 1.5, tint: [1, 1, 1] };
+      // Fensterwand aus 4 Boxen (Öffnung bleibt frei)
+      scene.objects.push(mkBox(0, (winY - winH) / 2, -wD2, wHalf, (winY - winH) / 2, wth, 0, wWallM));
+      scene.objects.push(mkBox(0, (winY + winH + wallH2) / 2, -wD2, wHalf, (wallH2 - winY - winH) / 2, wth, 0, wWallM));
+      scene.objects.push(mkBox((-wHalf + winX - winW) / 2, winY, -wD2, (winX - winW + wHalf) / 2, winH, wth, 0, wWallM));
+      scene.objects.push(mkBox((wHalf + winX + winW) / 2, winY, -wD2, (wHalf - winX - winW) / 2, winH, wth, 0, wWallM));
+      scene.objects.push(mkPlane(-8, 0, 0, 1, 0, 0, wWallM));
+      scene.objects.push(mkPlane(8, 0, 0, -1, 0, 0, wWallM));
+      scene.objects.push(mkPlane(0, 0, 8, 0, 0, -1, wWallM));
+      scene.objects.push(mkPlane(0, wallH2, 0, 0, -1, 0, wWallM));
+      var nw5 = Rl.int(2, 4);
+      for (i = 0; i < nw5; i++) {
+        spot = placeOnFloor(Rl, placed, 0.4, 1, 3.5);
+        if (!spot) break;
+        scene.objects.push(randObjOnFloor(Rl, Rp, pal, spot, ['sphere', 'sphere', 'box', 'torus']));
+      }
+      floorMat = makeFloorMat(Rl, Rp, pal, sky, 'room');
+      windowLight = { x: winX + Rl.range(-1, 1), y: winY + Rl.range(2, 5), z: -wD2 - Rl.range(8, 14) };
+      scene.ambient = scale3(scene.ambient, 1.4);
+      customCam = { ex: Rc.range(-2, 2), ey: Rc.range(1.2, 2.6), ez: Rc.range(3, 6),
+        lx: winX * 0.6 + Rc.range(-0.6, 0.6), ly: Rc.range(1, 1.9), lz: -wD2, fov: Rc.range(50, 66) };
+      maxH = wallH2;
+      boundR = 6;
+      break;
+    }
+    case 'stairs': { // Wendeltreppe
+      var stN3 = Rl.int(18, 28);
+      var dA2 = Rl.range(0.28, 0.42) * (Rl.chance(0.5) ? 1 : -1);
+      var dY2 = Rl.range(0.16, 0.2);
+      var sRad2 = Rl.range(1.1, 1.5);
+      var stM3 = Rl.chance(0.45) ? matMarbleTex(Rp, pal) : Rl.chance(0.5) ? matWood(Rp, pal) : matGlossy(Rp, pal);
+      var stChrome = matChrome(Rp);
+      scene.objects.push(mkCyl(0, 0, 0, stN3 * dY2 + 0.6, Rl.range(0.14, 0.2), stChrome));
+      for (i = 0; i < stN3; i++) {
+        var sAng2 = i * dA2;
+        var scx2 = Math.sin(sAng2) * sRad2, scz2 = Math.cos(sAng2) * sRad2;
+        scene.objects.push(mkBox(scx2, i * dY2 + 0.05, scz2, 0.85, 0.045, 0.3, sAng2 + Math.PI / 2, stM3));
+        if (i % 2 === 0) { // Geländer-Kugeln außen
+          scene.objects.push(mkSphere(Math.sin(sAng2) * (sRad2 + 0.7), i * dY2 + 0.48,
+            Math.cos(sAng2) * (sRad2 + 0.7), 0.07, stChrome));
+        }
+      }
+      if (Rl.chance(0.5)) { // Kugel auf einer Stufe
+        var sbi = Rl.int(4, stN3 - 4);
+        var sbAng = sbi * dA2;
+        scene.objects.push(mkSphere(Math.sin(sbAng) * sRad2, sbi * dY2 + 0.07 + 0.28,
+          Math.cos(sbAng) * sRad2, 0.28, matChrome(Rp)));
+      }
+      placed.push({ x: 0, z: 0, r: sRad2 + 1.6 });
+      var stH3 = stN3 * dY2;
+      var stCa = Rc.next() * Math.PI * 2;
+      var stCd = Rc.range(5.5, 8.5);
+      customCam = { ex: Math.sin(stCa) * stCd, ey: stH3 * Rc.range(0.35, 0.65), ez: Math.cos(stCa) * stCd,
+        lx: 0, ly: stH3 * 0.45, lz: 0, fov: Rc.range(48, 62) };
+      maxH = stH3 + 1;
+      boundR = sRad2 + 1.6;
+      break;
+    }
     case 'terrain': {
       hasFloor = false;
       var tAmp = Rl.range(4.5, 8);
@@ -2755,6 +3161,9 @@ function generateScene(seeds, opts) {
     }
   }
 
+  // Motive in ihre statische Grundpose bringen
+  if (scene.jug || scene.newton || scene.boing) applyAnim(scene, null);
+
   // Kleine Streukugeln als Deko
   if (hasFloor && arch !== 'columns' && Rl.chance(0.35)) {
     var pebN = Rl.int(4, 10);
@@ -2792,8 +3201,12 @@ function generateScene(seeds, opts) {
     mLz = Math.max(-rd2, Math.min(rd2, mLz * 0.2));
     mLy = Rs.range(4, 6.5);
   }
+  if (windowLight) { mLx = windowLight.x; mLy = windowLight.y; mLz = windowLight.z; }
   scene.lights.push({ x: mLx, y: mLy, z: mLz, col: mainCol, rad: Rs.range(0.9, 2.2),
     intensity: night ? Rs.range(0.6, 0.9) : Rs.range(0.95, 1.35) });
+  if (windowLight) { // sanftes Fülllicht, damit der Innenraum lesbar bleibt
+    scene.lights.push({ x: 2, y: 3.2, z: 4.5, col: [1, 0.97, 0.9], rad: 1.5, intensity: 0.32 });
+  }
   var fillN = night ? Rs.int(1, 2) : wpick(Rs, [[0, 2], [1, 2], [2, 1]]);
   for (i = 0; i < fillN; i++) {
     var faz = Rs.next() * Math.PI * 2;
@@ -2839,7 +3252,7 @@ function generateScene(seeds, opts) {
   }
 
   // God-Rays (volumetrische Lichtstrahlen)
-  var grRoll = Rs.chance(arch === 'columns' || arch === 'forest' ? 0.3 : 0.07);
+  var grRoll = Rs.chance(arch === 'window' ? 0.95 : arch === 'columns' || arch === 'forest' ? 0.3 : 0.07);
   var grStr = Rs.range(0.09, 0.2), grFall = Rs.range(0.03, 0.07);
   if (opts.rays === 1 || (opts.rays !== 0 && grRoll)) {
     scene.godRays = { strength: grStr, fall: grFall };
@@ -2865,11 +3278,12 @@ function generateScene(seeds, opts) {
     cam = customCam;
   } else {
     var bR = boundR, bH = maxH;
+    var tightCam = arch === 'still' || arch === 'studio'; // Nahaufnahme erzwingen
     for (i = 0; i < scene.objects.length; i++) {
       o = scene.objects[i];
       if (o.type === 'plane') continue;
       var od = Math.sqrt(o.cx * o.cx + o.cz * o.cz) + o.bound;
-      if (od > bR) bR = od;
+      if (!tightCam && od > bR) bR = od;
       var oh = (o.type === 'cyl' || o.type === 'cone') ? o.y1 : o.cy + o.bound;
       if (oh > bH) bH = oh;
     }
@@ -3472,6 +3886,55 @@ function zipStore(files) { // [{name, data:Uint8Array}]
   return result;
 }
 
+// ---------------------------------------------------------------- Motiv-Animationen
+function jugglePos(scene, t) { // Kaskaden-Loop der drei Bälle
+  var G = scene.jug;
+  for (var i = 0; i < 3; i++) {
+    var u = (t + i / 3) % 1;
+    var b = G.balls[i];
+    if (u < 0.62) { // Flugphase (Parabel)
+      var s = u / 0.62;
+      b.cx = -G.hx + 2 * G.hx * s;
+      b.cy = G.hy + (G.peak - G.hy) * 4 * s * (1 - s);
+    } else { // Rücktransport in der Hand
+      var s2 = (u - 0.62) / 0.38;
+      b.cx = G.hx - 2 * G.hx * s2;
+      b.cy = G.hy - 0.25 * Math.sin(Math.PI * s2) * G.s;
+    }
+    b.cz = G.hz;
+  }
+}
+function newtonPos(scene, t) {
+  var N = scene.newton;
+  var s = Math.sin(t * Math.PI * 2);
+  for (var i = 0; i < N.balls.length; i++) {
+    var th = 0;
+    if (i === 0 && s > 0) th = -N.amp * s;
+    if (i === N.balls.length - 1 && s < 0) th = -N.amp * s;
+    var b = N.balls[i];
+    var bx = N.x0s[i] + Math.sin(th) * N.L;
+    var by = N.pivotY - Math.cos(th) * N.L;
+    b.cx = bx; b.cy = by;
+    var ch = N.chains[i];
+    for (var sd = 0; sd < 2; sd++) {
+      var pz = sd === 0 ? N.barZ : -N.barZ;
+      var arr = ch[sd];
+      for (var j = 0; j < arr.length; j++) {
+        var u = (j + 1) / (arr.length + 1);
+        arr[j].cx = N.x0s[i] + (bx - N.x0s[i]) * u;
+        arr[j].cy = N.pivotY + (by - N.pivotY) * u;
+        arr[j].cz = pz * (1 - u);
+      }
+    }
+  }
+}
+function boingPos(scene, t) {
+  var B = scene.boing;
+  var u = (t * 2) % 1;
+  B.ball.cy = B.r + B.h * 4 * u * (1 - u);
+  B.ball.cx = Math.sin(t * Math.PI * 2) * 1.3;
+}
+
 // ---------------------------------------------------------------- Animation
 // Setzt die Szene erst auf den Grundzustand zurück und wendet dann den absoluten
 // Animationszustand für t ∈ [0,1) an — dadurch idempotent (wichtig für gecachte Szenen).
@@ -3490,6 +3953,17 @@ function applyAnim(scene, anim) {
   if (sun && sun.x0 !== undefined) { sun.x = sun.x0; sun.z = sun.z0; }
   var L = scene.lights[0];
   if (L && L.x0 !== undefined) { L.x = L.x0; L.z = L.z0; }
+  // Motive in statische Grundpose bringen (bewegte Geometrie → BVH neu aufbauen)
+  var moved = false;
+  if (scene.jug) { jugglePos(scene, 0); moved = true; }
+  if (scene.newton) { newtonPos(scene, 0.13); moved = true; }
+  if (scene.boing) { boingPos(scene, 0.3); moved = true; }
+  if (anim) {
+    if (anim.type === 'juggle' && scene.jug) jugglePos(scene, anim.t);
+    else if (anim.type === 'newton' && scene.newton) newtonPos(scene, anim.t);
+    else if (anim.type === 'boing' && scene.boing) boingPos(scene, anim.t);
+  }
+  if (moved) scene._accel = null;
   if (!anim) return;
   if (anim.type === 'waves') {
     for (i = 0; i < scene.objects.length; i++) {
@@ -3615,7 +4089,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   var qualSel = document.getElementById('qualSel');
   var vividChk = document.getElementById('vividChk');
   var ditherChk = document.getElementById('ditherChk');
-  var VIVID_SAT = 1.35, VIVID_CON = 0.25;
+  var VIVID_SAT = 1.5, VIVID_CON = 0.3;
   var autoChk = document.getElementById('autoChk');
   var archSel = document.getElementById('archSel');
   var palSel = document.getElementById('palSel');
@@ -4003,6 +4477,44 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     statusEl.textContent = 'Als Favorit gespeichert.';
   }
 
+  // ---------------- Galerie berühmter Motive ----------------
+  var GALLERY = [
+    { n: 'Der Jongleur', h: '7;juggler' },
+    { n: 'Boing-Ball', h: '2;boing' },
+    { n: 'Billard', h: '3;billiard' },
+    { n: 'Newton-Pendel', h: '4;newton' },
+    { n: 'Stillleben mit Wein', h: '14;still' },
+    { n: 'Saturn über Schachbrett', h: '70;rings' },
+    { n: 'Berglandschaft', h: '1;terrain' },
+    { n: 'Schwimmbad', h: '3;pool' },
+    { n: 'Schachbrett am See', h: '4;chess' },
+    { n: 'Wendeltreppe', h: '9;stairs' },
+    { n: 'Tempel', h: '7;temple' },
+    { n: 'Spiegelsaal', h: '21;mirror' },
+    { n: 'Menger-Schwamm', h: '1;menger' },
+    { n: 'Kugelpyramide', h: '6;pyramid' },
+    { n: 'Säulenhalle mit God-Rays', h: '12;columns;;rays=1' }
+  ];
+  var gallerySel = document.getElementById('gallerySel');
+  function fillGallery() {
+    GALLERY.forEach(function (g) {
+      var o = document.createElement('option');
+      o.value = g.h;
+      o.textContent = g.n;
+      gallerySel.appendChild(o);
+    });
+  }
+  gallerySel.addEventListener('change', function () {
+    if (!gallerySel.value) return;
+    var segs = gallerySel.value.split(';');
+    archSel.value = segs[1] || '';
+    palSel.value = segs[2] || '';
+    applyFxString(segs[3] || '');
+    var seed = segs[0];
+    gallerySel.value = '';
+    startRender(RT90.parseSeedInput(seed));
+  });
+
   // ---------------- Batch-Export (ZIP) ----------------
   function runBatch() {
     if (busy) return;
@@ -4074,7 +4586,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     animFmt.querySelector('option[value=webm]').disabled = true;
   }
   function pathCam(path, cam0, t) {
-    if (path === 'wellen' || path === 'sonne') {
+    if (path !== 'orbit' && path !== 'spirale') {
       return { ex: cam0.ex, ey: cam0.ey, ez: cam0.ez, lx: cam0.lx, ly: cam0.ly, lz: cam0.lz, fov: cam0.fov };
     }
     var ang = t * Math.PI * 2;
@@ -4164,7 +4676,11 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       if (fi >= FRAMES) { finish(); return; }
       var t = fi / FRAMES;
       var cam = pathCam(path, cam0, t);
-      var anim = path === 'wellen' ? { type: 'waves', t: t } : path === 'sonne' ? { type: 'sun', t: t } : null;
+      var anim = path === 'wellen' ? { type: 'waves', t: t }
+               : path === 'sonne' ? { type: 'sun', t: t }
+               : path === 'jonglieren' ? { type: 'juggle', t: t }
+               : path === 'pendel' ? { type: 'newton', t: t }
+               : path === 'huepfen' ? { type: 'boing', t: t } : null;
       statusEl.textContent = 'Animation (' + path + '): Frame ' + (fi + 1) + ' / ' + FRAMES + ' …';
       renderImage(current.seeds, opts, W, H, mode, cam, anim, null, isCancelled).then(function (img) {
         if (isCancelled() || !img) { abort(); return; }
@@ -4296,6 +4812,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   });
 
   // ---------------- Start ----------------
+  fillGallery();
   refreshStrips();
   var h = location.hash ? location.hash.slice(1) : '';
   if (h) {
