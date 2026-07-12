@@ -25,10 +25,12 @@ Abhängigkeiten — einfach `index.html` im Browser öffnen, kein Server nötig.
 - **Bild-Leiste**: Farbintensität (Aus bis Extrem — Sättigungs-Boost +
   Kontrast-S-Kurve, kompensiert das Auswaschen durch die Gamma-Korrektur und
   bringt den kontrastreichen CRT-Look zurück), Helligkeit, Spiegelungsstärke
-  und Kontaktschatten (Ambient Occlusion). Farbintensität und Helligkeit sind
-  reine Nachbearbeitung (ohne Neu-Rendern umschaltbar) und werden als
-  Voreinstellung gemerkt. **Der PNG-Export bäckt exakt das angezeigte,
-  gegradete Bild ein** — was du siehst, wird gespeichert.
+  und Kontaktschatten (Ambient Occlusion). Das Farb-Grading wird **direkt beim
+  Rendern** auf die Float-Farbwerte angewandt (vor der 8-Bit-Wandlung, siehe
+  `tone3`) — das knallige Bild entsteht also im Renderer selbst, nicht als
+  nachträglicher Filter, und ohne Banding durch Quantisierung. Farbintensität
+  und Helligkeit werden als Voreinstellung gemerkt. Der PNG-Export ist damit
+  automatisch exakt das angezeigte Bild.
 - **256 Farben**: Median-Cut-Quantisierung + Floyd-Steinberg-Dithering für
   den authentischen GIF-Look von damals (ohne Neu-Rendern umschaltbar).
 - **Batch-ZIP**: rendert 8 Zufallsbilder und lädt sie gesammelt als ZIP.

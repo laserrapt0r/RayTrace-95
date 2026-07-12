@@ -106,7 +106,9 @@ for (const spec of specs) {
   }
   const t0 = Date.now();
   const scene = RT90.generateScene(parsed.seeds, opts);
-  const r = RT90.createRenderer(scene, W, H, MODE);
+  // Farb-Grading passiert direkt beim Rendern (tone3), nicht mehr als Filter danach
+  const grade = process.env.NOGRADE === '1' ? null : { sat: 1.5, con: 0.3, expo: 1 };
+  const r = RT90.createRenderer(scene, W, H, MODE, grade);
   const buf = new Uint8ClampedArray(W * H * 4);
   r.renderBand(0, H, buf);
   let flareTxt = '';
@@ -117,7 +119,6 @@ for (const spec of specs) {
   if (process.env.BLOOM === '1' || (process.env.BLOOM !== '0' && scene.bloomAuto)) {
     RT90.applyBloom(buf, W, H, scene.bloomAmt || 0.6);
   }
-  if (process.env.NOGRADE !== '1') RT90.applyColorGrade(buf, W, H, 1.5, 0.3);
   if (process.env.FRAME === '1') RT90.drawCaption(buf, W, H, 'RAYTRACE 95 - SEED ' + seedStr + ' - 14H 23MIN');
   let out = buf;
   if (process.env.DITHER === '1') out = RT90.quantizeDither(buf, W, H).rgba;

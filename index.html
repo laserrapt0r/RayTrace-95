@@ -3430,12 +3430,17 @@ function projectSun(scene, W, H) {
 
 // ---------------------------------------------------------------- Renderer
 var OFF4 = [[0.125, 0.375], [0.625, 0.125], [0.375, 0.875], [0.875, 0.625]];
-function createRenderer(scene, W, H, mode) {
+function createRenderer(scene, W, H, mode, grade) {
   var cam = scene.cam;
   var b = camBasis(cam, W, H);
   var fx = b.fx, fy = b.fy, fz = b.fz, rx = b.rx, ry = b.ry, rz = b.rz, ux = b.ux, uy = b.uy, uz = b.uz;
   var tanF = b.tanF, aspect = b.aspect;
   var invG = 1 / 2.2;
+  var TONE = [0, 0, 0];
+  var gS = grade && grade.sat != null ? grade.sat : 1;
+  var gC = grade && grade.con != null ? grade.con : 0;
+  var gE = grade && grade.expo != null ? grade.expo : 1;
+  var noGrade = gS === 1 && gC === 0 && gE === 1;
 
   function sampleAt(x, y, sx, sy) {
     var dx, dy, dz;
@@ -3458,7 +3463,25 @@ function createRenderer(scene, W, H, mode) {
     var dl = 1 / Math.sqrt(dx * dx + dy * dy + dz * dz);
     return trace(scene, cam.ex, cam.ey, cam.ez, dx * dl, dy * dl, dz * dl, 0, 1);
   }
-  function gByte(c) { return Math.pow(c < 0 ? 0 : c > 1 ? 1 : c, invG) * 255; }
+  // Tone-Mapping inkl. Farb-Grading direkt auf den Float-Werten (vor der 8-Bit-Wandlung):
+  // Gamma → Belichtung → Sättigung → Kontrast. So entsteht der knallige Look beim Rendern
+  // selbst, nicht als nachträglicher Filter — und ohne Banding durch Quantisierung.
+  function tone3(r, g, b) {
+    r = r < 0 ? 0 : r > 1 ? 1 : r; g = g < 0 ? 0 : g > 1 ? 1 : g; b = b < 0 ? 0 : b > 1 ? 1 : b;
+    r = Math.pow(r, invG); g = Math.pow(g, invG); b = Math.pow(b, invG);
+    if (!noGrade) {
+      r *= gE; g *= gE; b *= gE;
+      var l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      r = l + (r - l) * gS; g = l + (g - l) * gS; b = l + (b - l) * gS;
+      if (r < 0) r = 0; else if (r > 1) r = 1;
+      if (g < 0) g = 0; else if (g > 1) g = 1;
+      if (b < 0) b = 0; else if (b > 1) b = 1;
+      r += (r * r * (3 - 2 * r) - r) * gC;
+      g += (g * g * (3 - 2 * g) - g) * gC;
+      b += (b * b * (3 - 2 * b) - b) * gC;
+    }
+    TONE[0] = r * 255; TONE[1] = g * 255; TONE[2] = b * 255;
+  }
 
   // Modus: 0 = schnell, 1 = adaptiv, 2 = 4×AA, 3 = adaptiv + weiche Schatten
   var soft = mode === 3;
@@ -3480,9 +3503,8 @@ function createRenderer(scene, W, H, mode) {
             c = sampleAt(x, y, offs[s][0], offs[s][1]);
             cr += c[0]; cg += c[1]; cb += c[2];
           }
-          out[idx++] = gByte(cr * invN);
-          out[idx++] = gByte(cg * invN);
-          out[idx++] = gByte(cb * invN);
+          tone3(cr * invN, cg * invN, cb * invN);
+          out[idx++] = TONE[0]; out[idx++] = TONE[1]; out[idx++] = TONE[2];
           out[idx++] = 255;
         }
       }
@@ -3498,9 +3520,10 @@ function createRenderer(scene, W, H, mode) {
       if (yy < 0) yy = 0; else if (yy >= H) yy = H - 1;
       for (x = 0; x < W; x++) {
         c = sampleAt(x, yy, 0.5, 0.5);
-        fl[o3] = c[0]; by[o3] = gByte(c[0]); o3++;
-        fl[o3] = c[1]; by[o3] = gByte(c[1]); o3++;
-        fl[o3] = c[2]; by[o3] = gByte(c[2]); o3++;
+        fl[o3] = c[0]; fl[o3 + 1] = c[1]; fl[o3 + 2] = c[2];
+        tone3(c[0], c[1], c[2]);
+        by[o3] = TONE[0]; by[o3 + 1] = TONE[1]; by[o3 + 2] = TONE[2];
+        o3 += 3;
       }
     }
     var THR = 24;
@@ -3526,9 +3549,8 @@ function createRenderer(scene, W, H, mode) {
             c = sampleAt(x, yb, OFF4[s][0], OFF4[s][1]);
             ar += c[0]; ag += c[1]; ab += c[2];
           }
-          out[idx++] = gByte(ar * 0.2);
-          out[idx++] = gByte(ag * 0.2);
-          out[idx++] = gByte(ab * 0.2);
+          tone3(ar * 0.2, ag * 0.2, ab * 0.2);
+          out[idx++] = TONE[0]; out[idx++] = TONE[1]; out[idx++] = TONE[2];
         } else {
           out[idx++] = by[i3];
           out[idx++] = by[i3 + 1];
@@ -4244,7 +4266,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
         '  RT90.applyAnim(self._scene, m.anim || null);\n' +
         '  RT90.STATS.rays = 0;\n' +
         '  var buf = new Uint8ClampedArray(m.W * (m.yEnd - m.yStart) * 4);\n' +
-        '  RT90.createRenderer(self._scene, m.W, m.H, m.mode).renderBand(m.yStart, m.yEnd, buf);\n' +
+        '  RT90.createRenderer(self._scene, m.W, m.H, m.mode, m.grade).renderBand(m.yStart, m.yEnd, buf);\n' +
         '  self.postMessage({ type: "band", jobId: m.jobId, yStart: m.yStart, yEnd: m.yEnd,\n' +
         '    buf: buf.buffer, rays: RT90.STATS.rays }, [buf.buffer]);\n' +
         '};\n';
@@ -4273,6 +4295,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       var nextBand = 0, doneBands = 0, totalBands = bands.length;
       var raysTotal = 0;
       var sceneKey = RT90.seedsToStr(seeds) + '|' + JSON.stringify(opts || {});
+      var grade = currentGrade();
 
       if (pool && !pool.failed) {
         var inFlight = 0;
@@ -4285,7 +4308,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
           var bd = bands[nextBand++];
           inFlight++;
           w.postMessage({ type: 'render', jobId: jobId, seeds: seeds, opts: opts, sceneKey: sceneKey,
-            W: W, H: H, mode: mode, cam: cam, anim: anim, yStart: bd[0], yEnd: bd[1] });
+            W: W, H: H, mode: mode, cam: cam, anim: anim, grade: grade, yStart: bd[0], yEnd: bd[1] });
         };
         var onMsg = function (e) {
           var m = e.data;
@@ -4334,7 +4357,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       if (cam) scene.cam = cam;
       RT90.applyAnim(scene, anim || null);
       RT90.STATS.rays = 0;
-      var renderer = RT90.createRenderer(scene, W, H, mode);
+      var renderer = RT90.createRenderer(scene, W, H, mode, currentGrade());
       var img = new ImageData(W, H);
       var y = 0, bandIdx = 0, totalBands = Math.ceil(H / BAND_H);
       function chunk() {
@@ -4463,14 +4486,17 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     var s0 = current.seeds ? current.seeds[0] : 0;
     return 'RAYTRACE 95 - SEED ' + (current.display || '') + ' - ' + (s0 % 23 + 1) + 'H ' + (s0 % 60) + 'MIN';
   }
-  // Bloom / Farb-Grading / Belichtung / Retro-Rahmen (in-place)
+  // Aktuelle Grading-Parameter (werden direkt im Renderer aufs Float-Bild angewandt)
+  function currentGrade() {
+    var g = GRADE_LEVELS[gradeSel.value] || GRADE_LEVELS.normal;
+    return { sat: g[0], con: g[1], expo: EXPO_LEVELS[expoSel.value] || 1 };
+  }
+  // Nachbearbeitung: nur noch Bloom + Retro-Rahmen. Farb-Grading passiert bereits
+  // beim Rendern (siehe tone3), nicht mehr hier.
   function postProcess(img, scene) {
     var W = img.width, H = img.height;
     var bloomOn = triSel.bloom.value === '1' || (triSel.bloom.value === '' && scene && scene.bloomAuto);
     if (bloomOn) RT90.applyBloom(img.data, W, H, scene ? scene.bloomAmt : 0.6);
-    var g = GRADE_LEVELS[gradeSel.value] || GRADE_LEVELS.normal;
-    var expo = EXPO_LEVELS[expoSel.value] || 1;
-    if (g[0] !== 1 || g[1] !== 0 || expo !== 1) RT90.applyColorGrade(img.data, W, H, g[0], g[1], expo);
     if (fxFrame.checked) RT90.drawCaption(img.data, W, H, captionText());
   }
   // Baut das fertige Bild aus lastMaster: Bloom → Grading → Rahmen → ggf. 256 Farben.
@@ -4899,12 +4925,12 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
     if (current.seeds) startRender({ seeds: current.seeds, display: current.display });
     else newImage();
   }
-  // Farbintensität + Helligkeit: reine Nachbearbeitung → sofort, ohne Neu-Rendern; als Voreinstellung merken
+  // Farbintensität + Helligkeit fließen jetzt direkt ins Rendering (tone3) → neu rendern; als Voreinstellung merken
   function saveImgPrefs() {
     try { localStorage.setItem('rt95_imgprefs', JSON.stringify({ g: gradeSel.value, e: expoSel.value })); } catch (e) {}
   }
-  gradeSel.addEventListener('change', function () { saveImgPrefs(); if (!busy) presentImage(); });
-  expoSel.addEventListener('change', function () { saveImgPrefs(); if (!busy) presentImage(); });
+  gradeSel.addEventListener('change', function () { saveImgPrefs(); rerenderCurrent(); });
+  expoSel.addEventListener('change', function () { saveImgPrefs(); rerenderCurrent(); });
   // Spiegelung + Kontaktschatten: greifen ins Rendering → neu rendern
   reflSel.addEventListener('change', rerenderCurrent);
   aoSel.addEventListener('change', rerenderCurrent);
