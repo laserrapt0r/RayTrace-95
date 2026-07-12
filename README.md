@@ -17,6 +17,10 @@ Abhängigkeiten — einfach `index.html` im Browser öffnen, kein Server nötig.
 - **Szene/Palette**: erzwingt einen bestimmten Archetyp bzw. ein Farbschema.
 - **Qualität**: Schnell (1 Strahl/Pixel) · Adaptiv (Kantenglättung nur an
   Kanten) · Maximal (4× überall) · Ultra (zusätzlich weiche Schatten).
+- **Knallige Farben** (Standard: an): Sättigungs-Boost + Kontrast-S-Kurve als
+  Nachbearbeitung — kompensiert das Auswaschen durch die Gamma-Korrektur und
+  bringt den kontrastreichen CRT-Look der alten Renderer zurück (ohne
+  Neu-Rendern umschaltbar).
 - **256 Farben**: Median-Cut-Quantisierung + Floyd-Steinberg-Dithering für
   den authentischen GIF-Look von damals (ohne Neu-Rendern umschaltbar).
 - **Batch-ZIP**: rendert 8 Zufallsbilder und lädt sie gesammelt als ZIP.
@@ -35,7 +39,8 @@ Objekte, Zentralkugel, Wasser, Innenraum, Sphereflake, Helix, Türme,
 Glasbox, fremde Welt (Planeten, Monolith, UFO), Ringe/Tori, Logo-Schriftzug
 (3D-Buchstaben aus einer 5×7-Pixelschrift), Würfel & Co (CSG: Spielwürfel
 mit Augen, angebissene Würfel, Schalen, Rohre), Menger-Schwamm und
-Säulenwald — kombiniert mit 6 Farbschemata, 6 Himmelstypen (inkl. Wolken,
+Säulenwald — kombiniert mit 7 Farbschemata (inkl. reiner
+POV-Ray-Primärfarben), 6 Himmelstypen (inkl. Wolken,
 Sternen, Silhouetten-Bergen und Planeten mit Ringen), Nebel, Lens Flare
 und Fake-Kaustiken unter Glasobjekten.
 

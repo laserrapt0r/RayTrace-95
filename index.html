@@ -175,6 +175,7 @@
         <option value="3">Ultra (weiche Schatten)</option>
       </select>
     </label>
+    <label class="cb"><input type="checkbox" id="vividChk" checked> Knallige Farben</label>
     <label class="cb"><input type="checkbox" id="ditherChk"> 256 Farben</label>
     <label class="cb"><input type="checkbox" id="autoChk"> Auto-Diashow</label>
   </div>
@@ -212,6 +213,7 @@
     <label>Palette:
       <select id="palSel">
         <option value="">Zufall</option>
+        <option value="primary">Primärfarben</option>
         <option value="mono">Monochrom</option>
         <option value="comp">Komplementär</option>
         <option value="triad">Triade</option>
@@ -1446,13 +1448,22 @@ function trace(scene, ox, oy, oz, dx, dy, dz, depth, weight) {
 // ---------------------------------------------------------------- Palette / Himmel / Boden
 function makePalette(R, force) {
   var h0 = R.next();
-  var scheme = wpick(R, [['mono', 2], ['comp', 3], ['triad', 2], ['pastel', 1.5], ['neon', 1.5], ['gray', 1]]);
+  var scheme = wpick(R, [['mono', 2], ['comp', 3], ['triad', 2], ['primary', 2.2],
+                         ['pastel', 1], ['neon', 1.5], ['gray', 0.8]]);
   if (force) scheme = force;
   var hues, satR, litR;
   switch (scheme) {
-    case 'mono': hues = [h0]; satR = [0.55, 0.95]; litR = [0.3, 0.65]; break;
-    case 'comp': hues = [h0, h0 + 0.5 + R.range(-0.06, 0.06)]; satR = [0.5, 0.95]; litR = [0.35, 0.6]; break;
-    case 'triad': hues = [h0, h0 + 1 / 3, h0 + 2 / 3]; satR = [0.5, 0.9]; litR = [0.35, 0.6]; break;
+    case 'mono': hues = [h0]; satR = [0.7, 1]; litR = [0.32, 0.6]; break;
+    case 'comp': hues = [h0, h0 + 0.5 + R.range(-0.06, 0.06)]; satR = [0.65, 1]; litR = [0.38, 0.58]; break;
+    case 'triad': hues = [h0, h0 + 1 / 3, h0 + 2 / 3]; satR = [0.65, 0.95]; litR = [0.38, 0.58]; break;
+    case 'primary': { // reine POV-Ray-Primärfarben
+      var prims = [0, 1 / 6, 1 / 3, 1 / 2, 2 / 3, 5 / 6];
+      var start = R.int(0, 5), cnt = R.int(2, 3);
+      hues = [];
+      for (var pi2 = 0; pi2 < cnt; pi2++) hues.push(prims[(start + pi2 * 2) % 6]);
+      satR = [0.92, 1]; litR = [0.42, 0.55];
+      break;
+    }
     case 'pastel': hues = [h0, h0 + R.range(0.1, 0.4), h0 + R.range(0.5, 0.8)]; satR = [0.25, 0.5]; litR = [0.6, 0.8]; break;
     case 'neon': hues = [h0, h0 + R.range(0.25, 0.5)]; satR = [0.9, 1]; litR = [0.5, 0.62]; break;
     default: hues = [h0]; satR = [0.6, 0.9]; litR = [0.4, 0.6];
@@ -1506,8 +1517,8 @@ function makeSky(R, pal, hint) {
     case 'gradient':
     case 'clouds': {
       var hb = R.chance(0.75) ? R.range(0.55, 0.66) : R.next();
-      sky.zen = hsl(hb, R.range(0.5, 0.85), R.range(0.3, 0.5));
-      sky.hor = mix3(hsl(hb + R.range(-0.05, 0.05), R.range(0.2, 0.5), R.range(0.7, 0.85)), [1, 1, 1], R.range(0, 0.4));
+      sky.zen = hsl(hb, R.range(0.65, 0.95), R.range(0.28, 0.45));
+      sky.hor = mix3(hsl(hb + R.range(-0.05, 0.05), R.range(0.3, 0.6), R.range(0.65, 0.8)), [1, 1, 1], R.range(0, 0.25));
       if (type === 'clouds') {
         sky.clouds = true;
         sky.cScale = R.range(0.15, 0.45); sky.cOff = R.range(0, 100);
@@ -1580,7 +1591,7 @@ function makeSky(R, pal, hint) {
 }
 
 function makeFloorMat(Rl, Rp, pal, sky, hint) {
-  var kind = wpick(Rl, [['bw', 3.2], ['colChecker', 2.2], ['marble', 1.4], ['solid', 1],
+  var kind = wpick(Rl, [['bw', 2.6], ['colChecker', 3], ['marble', 1.1], ['solid', 1.2],
                         ['grid', (sky.stars || pal.scheme === 'neon') ? 2 : 0.4], ['stripes', 0.8],
                         ['wood', hint === 'room' ? 2.5 : 0.6], ['bozo', hint === 'alien' ? 3 : 0.3]]);
   var tex, reflect = Math.pow(Rl.next(), 1.6) * 0.45;
@@ -2231,8 +2242,8 @@ function generateScene(seeds, opts) {
   // Lichter — Hauptlicht folgt der Sonne, falls vorhanden
   var sun = sky.sun;
   var mainCol = night ? mix3([1, 1, 1], hsl(Rs.next(), 0.5, 0.7), 0.4)
-              : sky.type === 'sunset' ? [1, 0.8, 0.6]
-              : mix3([1, 1, 1], hsl(pal.h0, 0.3, 0.8), 0.25);
+              : sky.type === 'sunset' ? [1, 0.82, 0.62]
+              : mix3([1, 1, 1], hsl(pal.h0, 0.3, 0.8), 0.15);
   var mLx, mLy, mLz;
   if (sun) { mLx = sun.x * 30; mLy = Math.max(6, sun.y * 30); mLz = sun.z * 30; }
   else {
@@ -2275,10 +2286,10 @@ function generateScene(seeds, opts) {
 
   // Nebel
   var fogP = arch === 'columns' ? 0.45 : arch === 'water' ? 0.45 : arch === 'alien' ? 0.5
-           : arch === 'forest' ? 0.75 : night ? 0.2 : 0.3;
+           : arch === 'forest' ? 0.75 : night ? 0.18 : 0.22;
   if (Rs.chance(fogP)) {
-    var halfD = Rs.range(35, 90);
-    scene.fog = { color: mix3(sky.hor, [1, 1, 1], night ? 0 : 0.2), density: 0.693 / halfD };
+    var halfD = Rs.range(45, 110);
+    scene.fog = { color: mix3(sky.hor, [1, 1, 1], night ? 0 : 0.08), density: 0.693 / halfD };
     scene.info.fog = true;
   }
 
@@ -2533,6 +2544,29 @@ function applyLensFlare(data, W, H, sx, sy, flare) {
     addDisc(gx, gy, W * GR[g] * st, gc, 0.16);
   }
   addRing(sx + (cx - sx) * 2.4, sy + (cy - sy) * 2.4, W * 0.09 * st, 2.5, hsl(flare.hue + 0.5, 0.5, 0.6), 0.14);
+}
+
+// ---------------------------------------------------------------- Farb-Grading (Knallig-Look)
+// Sättigungs-Boost + sanfte S-Kurve — kompensiert das „Auswaschen“ durch die
+// Gamma-Korrektur und bringt den kontrastreichen CRT-Look der alten Renderer zurück.
+function applyColorGrade(data, W, H, sat, con) {
+  var n = W * H * 4;
+  for (var i = 0; i < n; i += 4) {
+    var r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255;
+    var l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    r = l + (r - l) * sat;
+    g = l + (g - l) * sat;
+    b = l + (b - l) * sat;
+    if (r < 0) r = 0; else if (r > 1) r = 1;
+    if (g < 0) g = 0; else if (g > 1) g = 1;
+    if (b < 0) b = 0; else if (b > 1) b = 1;
+    r += (r * r * (3 - 2 * r) - r) * con;
+    g += (g * g * (3 - 2 * g) - g) * con;
+    b += (b * b * (3 - 2 * b) - b) * con;
+    data[i] = r * 255;
+    data[i + 1] = g * 255;
+    data[i + 2] = b * 255;
+  }
 }
 
 // ---------------------------------------------------------------- 256-Farben-Quantisierung + Dithering
@@ -2866,6 +2900,7 @@ var RT90 = {
   generateScene: generateScene, createRenderer: createRenderer,
   deriveSeeds: deriveSeeds, parseSeedInput: parseSeedInput, seedsToStr: seedsToStr,
   projectSun: projectSun, applyLensFlare: applyLensFlare, applyAnim: applyAnim,
+  applyColorGrade: applyColorGrade,
   quantizeDither: quantizeDither, gifEncode: gifEncode, zipStore: zipStore, webmMux: webmMux,
   ARCHS: ARCH_WEIGHTS.map(function (a) { return a[0]; }),
   STATS: STATS
@@ -2885,7 +2920,9 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   var titleSeed = document.getElementById('titleSeed');
   var sizeSel = document.getElementById('sizeSel');
   var qualSel = document.getElementById('qualSel');
+  var vividChk = document.getElementById('vividChk');
   var ditherChk = document.getElementById('ditherChk');
+  var VIVID_SAT = 1.35, VIVID_CON = 0.25;
   var autoChk = document.getElementById('autoChk');
   var archSel = document.getElementById('archSel');
   var palSel = document.getElementById('palSel');
@@ -3095,18 +3132,24 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
       }
     });
   }
-  // Zeigt lastMaster an, wendet ggf. 256-Farben-Dithering an
+  // Zeigt lastMaster an, wendet ggf. Farb-Grading und 256-Farben-Dithering an
   function presentImage() {
     if (!lastMaster) return;
     var W = lastMaster.width, H = lastMaster.height;
     if (cv.width !== W || cv.height !== H) setCanvasSize(W, H);
+    var work = lastMaster;
+    if (vividChk.checked) {
+      work = new ImageData(W, H);
+      work.data.set(lastMaster.data);
+      RT90.applyColorGrade(work.data, W, H, VIVID_SAT, VIVID_CON);
+    }
     if (ditherChk.checked) {
-      var q = RT90.quantizeDither(lastMaster.data, W, H);
+      var q = RT90.quantizeDither(work.data, W, H);
       var di = new ImageData(W, H);
       di.data.set(q.rgba);
       ctx.putImageData(di, 0, 0);
     } else {
-      ctx.putImageData(lastMaster, 0, 0);
+      ctx.putImageData(work, 0, 0);
     }
   }
 
@@ -3232,6 +3275,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
           var sp = RT90.projectSun(scene, W, H);
           if (sp) RT90.applyLensFlare(img.data, W, H, sp.x, sp.y, scene.flare);
         }
+        if (vividChk.checked) RT90.applyColorGrade(img.data, W, H, VIVID_SAT, VIVID_CON);
         var show = img;
         if (ditherChk.checked) {
           var q = RT90.quantizeDither(img.data, W, H);
@@ -3360,6 +3404,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
           var sp = RT90.projectSun(sc2, W, H);
           if (sp) RT90.applyLensFlare(img.data, W, H, sp.x, sp.y, baseScene.flare);
         }
+        if (vividChk.checked) RT90.applyColorGrade(img.data, W, H, VIVID_SAT, VIVID_CON);
         var show = img;
         if (fmt === 'gif' || ditherChk.checked) {
           var q = RT90.quantizeDither(img.data, W, H);
@@ -3454,6 +3499,7 @@ if (typeof window !== 'undefined') window.RT90 = RT90;
   sizeSel.addEventListener('change', function () { if (current.seeds) startRender({ seeds: current.seeds, display: current.display }, current.opts); });
   qualSel.addEventListener('change', function () { if (current.seeds) startRender({ seeds: current.seeds, display: current.display }, current.opts); });
   ditherChk.addEventListener('change', function () { if (!busy) presentImage(); });
+  vividChk.addEventListener('change', function () { if (!busy) presentImage(); });
   archSel.addEventListener('change', function () { newImage(); });
   palSel.addEventListener('change', function () { newImage(); });
   autoChk.addEventListener('change', function () {

@@ -108,9 +108,11 @@ for (const spec of specs) {
     const sp = RT90.projectSun(scene, W, H);
     if (sp) { RT90.applyLensFlare(buf, W, H, sp.x, sp.y, scene.flare); flareTxt = ' / flare'; }
   }
+  if (process.env.NOGRADE !== '1') RT90.applyColorGrade(buf, W, H, 1.35, 0.25);
   let out = buf;
   if (process.env.DITHER === '1') out = RT90.quantizeDither(buf, W, H).rgba;
-  const name = `s${seedStr}${arch ? '_' + arch : ''}${process.env.DITHER === '1' ? '_d' : ''}`;
+  const name = `s${seedStr}${arch ? '_' + arch : ''}` +
+    `${process.env.DITHER === '1' ? '_d' : ''}${process.env.NOGRADE === '1' ? '_flat' : ''}`;
   writePNG(path.join(outDir, name + '.png'), W, H, out);
   console.log(`${spec}: ${scene.info.arch} / ${scene.info.sky} / ${scene.info.pal}` +
     `${scene.info.fog ? ' / fog' : ''}${flareTxt} — ${((Date.now() - t0) / 1000).toFixed(1)}s -> ${name}.png`);
